@@ -46,7 +46,7 @@ const SEED = {
   waters: [
     { id: 1, name: 'Steinelva', location: 'Gausdal · 4,2 km', desc: 'Klubbens flaggskip. Rik bestand av storvokst ørret og harr.', tags: ['Ørret', 'Harr', 'Flue + sluk'] },
     { id: 2, name: 'Langvann', location: 'Øyer · 1,8 km²', desc: 'Stille fjellvann med god ørretbestand. Ideelt for båtfiske og flue fra land.', tags: ['Ørret', 'Båt tillatt', 'Flue'] },
-    { id: 3, name: 'Håpetjernet', location: 'Lillehammer · 0,4 km²', desc: 'Nylig kalket og gjenopprettet. Åpner forventet sesong 2027.', tags: ['Ørret', 'Stengt til 2027'] },
+    { id: 3, name: 'Håpetjernet', location: 'hammer · 0,4 km²', desc: 'Nylig kalket og gjenopprettet. Åpner forventet sesong 2027.', tags: ['Ørret', 'Stengt til 2027'] },
     { id: 4, name: 'Raudalselva', location: 'Ringebu · 2,8 km', desc: 'Villmarkspreget elv. Laks i nedre del i august.', tags: ['Laks', 'Ørret', 'Kun flue'] },
     { id: 5, name: 'Bjørntjernet', location: 'Fåvang · 0,6 km²', desc: 'Lavlandssjø med stor abbor og noe gjedde. God for nybegynnere.', tags: ['Abbor', 'Gjedde', 'Alle metoder'] },
   ],
@@ -918,7 +918,7 @@ export default function App() {
         <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1rem', color: CO.cream, marginBottom: 5 }}>
           Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua
         </p>
-        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Lillehammer, Innlandet<br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
+        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Nøklevann, Bøler<br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
       </footer>
 
       {toastMsg && <Toast message={toastMsg} />}
