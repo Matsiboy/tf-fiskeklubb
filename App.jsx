@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { db } from './firebase.js'
-import {
-  doc, getDoc, setDoc, onSnapshot, collection, getDocs
-} from 'firebase/firestore'
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const CREDENTIALS = { medlem: 'stangfisker', admin: 'leder2025' }
@@ -15,38 +13,33 @@ const CO = {
   white: '#ffffff', text: '#2a2a2a',
 }
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
+// ─── Seed data (only used if Firebase is completely empty) ────────────────────
 const SEED = {
   news: [
-    { id: 1, date: '14. mai 2025', badge: 'Fangst', title: 'Årsrekord ørret fanget på Steinelva', text: 'Lars Holm satte ny klubbrekord med en 2,3 kg storvokst ørret. Fanget på en hjemmelaget caddis-flue i kveldstimene.', color: '#2d6a8f' },
-    { id: 2, date: '2. mai 2025', badge: 'Kurs', title: 'Fluebinderkurs 7. juni — meld deg på nå', text: 'Kjell Andersen holder kurs i tradisjonell fluebinding. Maks 12 plasser. Inkludert materiell og kaffe.', color: '#1a2e1a' },
-    { id: 3, date: '28. april 2025', badge: 'Info', title: 'Ny parkeringsordning ved Langvann', text: 'Fra 1. juni innføres ny parkeringsordning. Parkering kun tillatt i merket område.', color: '#2d6a8f' },
-    { id: 4, date: '15. mars 2025', badge: 'Styre', title: 'Referat fra årsmøtet 2025', text: 'Ny kasserer valgt. Kontingent uendret. Vedtatt å kjøpe nytt kastefelt.', color: '#1a2e1a' },
-    { id: 5, date: '3. mars 2025', badge: 'Miljø', title: 'Kalking av Håpetjernet vellykket', text: 'Etter to sesonger er pH-nivået stabilt. Ørretyngel satt ut i mars.', color: '#2d6a8f' },
+    { id: 1, date: '2025-05-14', badge: 'Fangst', title: 'Årsrekord ørret fanget på Steinelva', text: 'Lars Holm satte ny klubbrekord med en 2,3 kg storvokst ørret. Fanget på en hjemmelaget caddis-flue i kveldstimene.', color: '#2d6a8f' },
+    { id: 2, date: '2025-05-02', badge: 'Kurs', title: 'Fluebinderkurs 7. juni — meld deg på nå', text: 'Kjell Andersen holder kurs i tradisjonell fluebinding. Maks 12 plasser. Inkludert materiell og kaffe.', color: '#1a2e1a' },
+    { id: 3, date: '2025-04-28', badge: 'Info', title: 'Ny parkeringsordning ved Langvann', text: 'Fra 1. juni innføres ny parkeringsordning. Parkering kun tillatt i merket område.', color: '#2d6a8f' },
   ],
   events: [
     { id: 1, day: '07', month: 'Jun', title: 'Fluebinderkurs med Kjell Andersen', location: 'Klubbhuset, Lillehammer', time: '10:00–16:00', note: 'Maks 12 plasser', tag: 'Kurs' },
     { id: 2, day: '14', month: 'Jun', title: 'Sesongåpningsfiske — Steinelva', location: 'Steinelva, nedre del', time: 'Start 07:00', note: 'Felles grillmat etterpå', tag: 'Sosialt' },
-    { id: 3, day: '12', month: 'Jul', title: 'Sommerstevne — Langvann', location: 'Langvann', time: 'Hele dagen', note: 'Familiedag og fiske', tag: 'Stevne' },
-    { id: 4, day: '09', month: 'Aug', title: 'Kastekurs for nybegynnere', location: 'Kastefelt v/ klubbhuset', time: '09:00–13:00', note: 'Gratis for nye medlemmer', tag: 'Kurs' },
-    { id: 5, day: '06', month: 'Sep', title: 'Høstkonkurranse — Tordivelen Cup', location: 'Steinelva', time: 'Start 06:00', note: 'Premieutdeling kl. 19:00', tag: 'Konkurranse' },
-    { id: 6, day: '18', month: 'Okt', title: 'Sesongslutt-middag og lysbildekveld', location: 'Klubbhuset', time: '18:00', note: 'Med årets beste fiskefoto', tag: 'Sosialt' },
+    { id: 3, day: '06', month: 'Sep', title: 'Høstkonkurranse — Tordivelen Cup', location: 'Steinelva', time: 'Start 06:00', note: 'Premieutdeling kl. 19:00', tag: 'Konkurranse' },
   ],
   members: [
-    { id: 1, name: 'Erik Haugen', role: 'Leder', badge: 'Styre' },
-    { id: 2, name: 'Ola Berget', role: 'Kasserer', badge: 'Styre' },
-    { id: 3, name: 'Marte Nygård', role: 'Sekretær', badge: 'Styre' },
-    { id: 4, name: 'Kjell Andersen', role: 'Sportsleder', badge: 'Styre' },
-    { id: 5, name: 'Lars Holm', role: 'Medlem siden 2010', badge: 'Rekordinnehaver' },
-    { id: 6, name: 'Anne Bråten', role: 'Medlem siden 2018', badge: '' },
-    { id: 7, name: 'Tor Svendsen', role: 'Medlem siden 1995', badge: 'Æresmedlem' },
-    { id: 8, name: 'Gunnar Fjeld', role: 'Juniorkontakt', badge: 'Styre' },
-    { id: 9, name: 'Ingrid Korsmo', role: 'Miljøkontakt', badge: '' },
+    { id: 1, name: 'Erik Haugen', role: 'Leder', badge: 'Styre', photo: '' },
+    { id: 2, name: 'Ola Berget', role: 'Kasserer', badge: 'Styre', photo: '' },
+    { id: 3, name: 'Marte Nygård', role: 'Sekretær', badge: 'Styre', photo: '' },
+    { id: 4, name: 'Kjell Andersen', role: 'Sportsleder', badge: 'Styre', photo: '' },
+    { id: 5, name: 'Lars Holm', role: 'Medlem siden 2010', badge: 'Rekordinnehaver', photo: '' },
+    { id: 6, name: 'Anne Bråten', role: 'Medlem siden 2018', badge: '', photo: '' },
+    { id: 7, name: 'Tor Svendsen', role: 'Medlem siden 1995', badge: 'Æresmedlem', photo: '' },
+    { id: 8, name: 'Gunnar Fjeld', role: 'Juniorkontakt', badge: 'Styre', photo: '' },
+    { id: 9, name: 'Ingrid Korsmo', role: 'Miljøkontakt', badge: '', photo: '' },
   ],
   waters: [
     { id: 1, name: 'Steinelva', location: 'Gausdal · 4,2 km', desc: 'Klubbens flaggskip. Rik bestand av storvokst ørret og harr.', tags: ['Ørret', 'Harr', 'Flue + sluk'] },
     { id: 2, name: 'Langvann', location: 'Øyer · 1,8 km²', desc: 'Stille fjellvann med god ørretbestand. Ideelt for båtfiske og flue fra land.', tags: ['Ørret', 'Båt tillatt', 'Flue'] },
-    { id: 3, name: 'Håpetjernet', location: 'hammer · 0,4 km²', desc: 'Nylig kalket og gjenopprettet. Åpner forventet sesong 2027.', tags: ['Ørret', 'Stengt til 2027'] },
+    { id: 3, name: 'Håpetjernet', location: 'Lillehammer · 0,4 km²', desc: 'Nylig kalket og gjenopprettet. Åpner forventet sesong 2027.', tags: ['Ørret', 'Stengt til 2027'] },
     { id: 4, name: 'Raudalselva', location: 'Ringebu · 2,8 km', desc: 'Villmarkspreget elv. Laks i nedre del i august.', tags: ['Laks', 'Ørret', 'Kun flue'] },
     { id: 5, name: 'Bjørntjernet', location: 'Fåvang · 0,6 km²', desc: 'Lavlandssjø med stor abbor og noe gjedde. God for nybegynnere.', tags: ['Abbor', 'Gjedde', 'Alle metoder'] },
   ],
@@ -57,20 +50,30 @@ const SEED = {
     { id: 4, icon: '🏆', title: 'Konkurranseregler', items: ['Tordivelen Cup: poengbasert, kun flue tillatt', 'All fisk veies i live og slippes ut igjen', 'Dommer må bekrefte fangst for å gi poeng', 'Juniorer (under 18) konkurrerer i egen klasse', 'Ingen bruk av ekkolodd eller elektronisk hjelpemiddel'] },
   ],
   catches: [
-    { id: 1, angler: 'Lars Holm', species: 'Ørret', weight: 2.3, length: 54, water: 'Steinelva', method: 'Flue', date: '14. mai 2025', note: 'Caddis-flue, kveldsfiske' },
-    { id: 2, angler: 'Tor Svendsen', species: 'Laks', weight: 4.1, length: 72, water: 'Raudalselva', method: 'Sluk', date: '8. august 2025', note: 'Sluppet ut igjen' },
-    { id: 3, angler: 'Marte Nygård', species: 'Ørret', weight: 1.8, length: 49, water: 'Langvann', method: 'Flue', date: '3. juli 2025', note: 'Fanget fra båt' },
-    { id: 4, angler: 'Kjell Andersen', species: 'Ørret', weight: 1.6, length: 47, water: 'Raudalselva', method: 'Flue', date: '22. juni 2025', note: '' },
-    { id: 5, angler: 'Erik Haugen', species: 'Harr', weight: 1.4, length: 46, water: 'Steinelva', method: 'Flue', date: '20. juni 2025', note: '' },
-    { id: 6, angler: 'Anne Bråten', species: 'Abbor', weight: 0.9, length: 34, water: 'Bjørntjernet', method: 'Mark', date: '15. juli 2025', note: '' },
+    { id: 1, angler: 'Lars Holm', species: 'Ørret', weight: 2.3, length: 54, water: 'Steinelva', method: 'Flue', date: '2025-05-14', note: 'Caddis-flue, kveldsfiske' },
+    { id: 2, angler: 'Tor Svendsen', species: 'Laks', weight: 4.1, length: 72, water: 'Raudalselva', method: 'Sluk', date: '2025-08-08', note: 'Sluppet ut igjen' },
+    { id: 3, angler: 'Marte Nygård', species: 'Ørret', weight: 1.8, length: 49, water: 'Langvann', method: 'Flue', date: '2025-07-03', note: 'Fanget fra båt' },
+    { id: 4, angler: 'Erik Haugen', species: 'Harr', weight: 1.4, length: 46, water: 'Steinelva', method: 'Flue', date: '2025-06-20', note: '' },
   ],
+}
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+// Format ISO date (2025-05-14) to Norwegian display (14. mai 2025)
+const NO_MONTHS = ['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember']
+function formatDate(iso) {
+  if (!iso) return ''
+  // already formatted (legacy data like "14. mai 2025")
+  if (iso.includes('.')) return iso
+  const [y, m, d] = iso.split('-')
+  if (!y || !m || !d) return iso
+  return `${parseInt(d)}. ${NO_MONTHS[parseInt(m) - 1]} ${y}`
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getInitials = (name) => name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 const nextId = (arr) => (arr.length ? Math.max(...arr.map((x) => x.id)) + 1 : 1)
 
-// Firebase read/write — each collection stored as a single doc with an `items` array
+// ─── Firebase helpers ─────────────────────────────────────────────────────────
 async function fbGet(key) {
   try {
     const snap = await getDoc(doc(db, 'data', key))
@@ -80,10 +83,33 @@ async function fbGet(key) {
 async function fbSet(key, value) {
   try { await setDoc(doc(db, 'data', key), { items: value }) } catch (e) { console.error(e) }
 }
-// Real-time listener
 function fbListen(key, cb) {
   return onSnapshot(doc(db, 'data', key), (snap) => {
     if (snap.exists()) cb(snap.data().items)
+  }, (err) => console.error('Listen error:', err))
+}
+
+// ─── Image to base64 ─────────────────────────────────────────────────────────
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    // Resize before storing to keep Firebase doc small
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const MAX = 200
+        let w = img.width, h = img.height
+        if (w > h) { if (w > MAX) { h = h * MAX / w; w = MAX } }
+        else { if (h > MAX) { w = w * MAX / h; h = MAX } }
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', 0.7))
+      }
+      img.src = e.target.result
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
   })
 }
 
@@ -97,9 +123,11 @@ const GLOBAL_CSS = `
   .tf-input { width: 100%; padding: 9px 12px; border: 1px solid #d0c8b8; border-radius: 6px; font-size: 14px; background: #fff; color: #2a2a2a; outline: none; box-sizing: border-box; }
   .tf-input:focus { border-color: #c8922a; }
   textarea.tf-input { resize: vertical; min-height: 72px; }
+  input[type="date"].tf-input { cursor: pointer; }
   .tf-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; border: 1px solid transparent; transition: opacity .15s, transform .1s; cursor: pointer; }
   .tf-btn:active { transform: scale(.97); }
   .tf-primary { background: #c8922a; color: #0f1d0f; border-color: #c8922a; }
+  .tf-primary:hover { opacity: .9; }
   .tf-ghost { background: transparent; color: #6b7c6b; border-color: #ddd; }
   .tf-ghost:hover { background: #f0ebe0; }
   .tf-danger { background: rgba(220,60,60,.08); color: #c0392b; border-color: rgba(220,60,60,.2); }
@@ -120,10 +148,13 @@ const GLOBAL_CSS = `
   .tf-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 600; display: flex; align-items: center; justify-content: center; padding: 1rem; }
   .tf-modal { background: #f5f0e8; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 460px; max-height: 90dvh; overflow-y: auto; }
   .tf-nav-desktop { display: flex; gap: 1px; }
-  .tf-hamburger { display: none; }
+  .tf-hamburger { display: none !important; }
+  .photo-upload { width: 80px; height: 80px; border-radius: 50%; border: 2px dashed #d0c8b8; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative; transition: border-color .2s; }
+  .photo-upload:hover { border-color: #c8922a; }
+  .photo-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   @media (max-width: 640px) {
     .tf-wrap { padding: 1.25rem .75rem; }
-    .tf-nav-desktop { display: none; }
+    .tf-nav-desktop { display: none !important; }
     .tf-hamburger { display: flex !important; }
     .tf-grid { grid-template-columns: 1fr; }
     .tf-grid-sm { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
@@ -207,6 +238,18 @@ function TagPill({ label, onRemove }) {
   )
 }
 
+// Member avatar — shows photo if available, else initials
+function MemberAvatar({ name, photo, size = 48 }) {
+  if (photo) {
+    return <img src={photo} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', background: `linear-gradient(135deg, ${CO.forest}, ${CO.river})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Playfair Display', serif", fontSize: size * 0.33, color: CO.gold, fontWeight: 700, flexShrink: 0 }}>
+      {getInitials(name)}
+    </div>
+  )
+}
+
 // ─── Login ────────────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
   const [username, setUsername] = useState('')
@@ -287,7 +330,7 @@ function SiteNav({ currentPage, onNavigate, onLogout }) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={onLogout} style={{ border: `1px solid rgba(200,146,42,.4)`, color: CO.gold, fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 6 }}>Logg ut</button>
           <button className="tf-hamburger" onClick={() => setMobileOpen((o) => !o)}
-            style={{ color: CO.mist, fontSize: 22, lineHeight: 1, padding: '4px 2px', display: 'none' }}>
+            style={{ color: CO.mist, fontSize: 22, lineHeight: 1, padding: '4px 2px' }}>
             {mobileOpen ? '✕' : '☰'}
           </button>
         </div>
@@ -353,7 +396,7 @@ function HomePage({ news, events, members, waters, catches, onNavigate }) {
             <div style={{ flex: 1 }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: CO.gold, marginBottom: 2 }}>Sesongens rekord</p>
               <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: CO.cream, fontSize: '1rem' }}>{topCatch.angler} — {topCatch.weight} kg {topCatch.species}</p>
-              <p style={{ fontSize: 12, color: CO.mist, opacity: .8 }}>{topCatch.water} · {topCatch.date}</p>
+              <p style={{ fontSize: 12, color: CO.mist, opacity: .8 }}>{topCatch.water} · {formatDate(topCatch.date)}</p>
             </div>
             <button onClick={() => onNavigate('toppliste')} style={{ border: `1px solid rgba(200,146,42,.4)`, color: CO.gold, fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 6, whiteSpace: 'nowrap' }}>
               Se toppliste →
@@ -370,7 +413,7 @@ function HomePage({ news, events, members, waters, catches, onNavigate }) {
               <div key={n.id} style={{ borderBottom: `1px solid ${CO.creamDk}`, paddingBottom: '.85rem', marginBottom: '.85rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                   <span style={{ background: CO.gold, color: CO.deep, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '2px 7px', borderRadius: 3 }}>{n.badge}</span>
-                  <span style={{ fontSize: 11, color: CO.muted }}>{n.date}</span>
+                  <span style={{ fontSize: 11, color: CO.muted }}>{formatDate(n.date)}</span>
                 </div>
                 <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: CO.forest, marginBottom: 2, fontSize: '.93rem' }}>{n.title}</p>
                 <p style={{ fontSize: 13, color: CO.muted, lineHeight: 1.6 }}>{n.text}</p>
@@ -434,7 +477,7 @@ function NewsPage({ news, setNews, showToast }) {
               <svg width="45" height="45" viewBox="0 0 80 80" fill="none" opacity=".2"><path d="M15 60 Q30 30 50 45 Q65 55 70 35" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round" /><circle cx="50" cy="45" r="5" fill={CO.gold} /></svg>
             </div>
             <div style={{ padding: '1rem' }}>
-              <p style={{ fontSize: 12, color: CO.muted, marginBottom: 3 }}>{n.date}</p>
+              <p style={{ fontSize: 12, color: CO.muted, marginBottom: 3 }}>{formatDate(n.date)}</p>
               <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: CO.forest, marginBottom: 5, lineHeight: 1.3, fontSize: '.95rem' }}>{n.title}</p>
               <p style={{ fontSize: 13, color: CO.muted, lineHeight: 1.6, marginBottom: 10 }}>{n.text}</p>
               <div style={{ display: 'flex', gap: 5 }}>
@@ -447,7 +490,7 @@ function NewsPage({ news, setNews, showToast }) {
       </div>
       {open && (
         <Modal title={editId ? 'Rediger nyhet' : 'Ny nyhet'} onClose={() => setOpen(false)}>
-          <FormRow label="Dato"><TFInput value={form.date} onChange={(v) => f('date', v)} placeholder="14. mai 2025" /></FormRow>
+          <FormRow label="Dato"><TFInput value={form.date} onChange={(v) => f('date', v)} type="date" /></FormRow>
           <FormRow label="Badge"><TFSelect value={form.badge} onChange={(v) => f('badge', v)} options={NEWS_BADGES} /></FormRow>
           <FormRow label="Tittel"><TFInput value={form.title} onChange={(v) => f('title', v)} placeholder="Overskrift…" /></FormRow>
           <FormRow label="Ingress"><TFInput value={form.text} onChange={(v) => f('text', v)} placeholder="Kort beskrivelse…" multiline /></FormRow>
@@ -613,7 +656,7 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
                 <td style={{ padding: '9px 11px' }}>{c.length} cm</td>
                 <td style={{ padding: '9px 11px', color: CO.muted, whiteSpace: 'nowrap' }}>{c.water}</td>
                 <td style={{ padding: '9px 11px', color: CO.muted }}>{c.method}</td>
-                <td style={{ padding: '9px 11px', color: CO.muted, whiteSpace: 'nowrap' }}>{c.date}</td>
+                <td style={{ padding: '9px 11px', color: CO.muted, whiteSpace: 'nowrap' }}>{formatDate(c.date)}</td>
                 <td style={{ padding: '9px 11px' }}>
                   <div style={{ display: 'flex', gap: 5 }}>
                     <TFBtn small onClick={() => openEdit(c)}>✏</TFBtn>
@@ -636,7 +679,7 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
           </div>
           <FormRow label="Vann"><TFSelect value={form.water} onChange={(v) => f('water', v)} options={wnames} /></FormRow>
           <FormRow label="Metode"><TFSelect value={form.method} onChange={(v) => f('method', v)} options={METHOD_LIST} /></FormRow>
-          <FormRow label="Dato"><TFInput value={form.date} onChange={(v) => f('date', v)} placeholder="14. mai 2025" /></FormRow>
+          <FormRow label="Dato"><TFInput value={form.date} onChange={(v) => f('date', v)} type="date" /></FormRow>
           <FormRow label="Merknad"><TFInput value={form.note} onChange={(v) => f('note', v)} placeholder="Valgfritt…" /></FormRow>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn>
@@ -653,20 +696,34 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
 const MEMBER_BADGES = ['', 'Styre', 'Æresmedlem', 'Rekordinnehaver', 'Junior']
 
 function MembersPage({ members, setMembers, showToast }) {
-  const empty = { name: '', role: '', badge: '' }
+  const empty = { name: '', role: '', badge: '', photo: '' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(empty)
   const [confirmId, setConfirmId] = useState(null)
+  const [uploading, setUploading] = useState(false)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+
+  const handlePhoto = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const b64 = await fileToBase64(file)
+      f('photo', b64)
+    } catch (err) { console.error(err) }
+    setUploading(false)
+  }
+
   const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
-  const openEdit = (m) => { setEditId(m.id); setForm({ ...m }); setOpen(true) }
+  const openEdit = (m) => { setEditId(m.id); setForm({ ...m, photo: m.photo || '' }); setOpen(true) }
   const save = () => {
     if (!form.name.trim()) return
     const updated = editId ? members.map((m) => m.id === editId ? { ...form, id: editId } : m) : [...members, { ...form, id: nextId(members) }]
     setMembers(updated); setOpen(false); showToast(editId ? 'Medlem oppdatert' : 'Nytt medlem lagt til')
   }
   const remove = (id) => { setMembers(members.filter((m) => m.id !== id)); setConfirmId(null); showToast('Medlem fjernet') }
+
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
@@ -680,8 +737,8 @@ function MembersPage({ members, setMembers, showToast }) {
       <div className="tf-grid-sm">
         {members.map((m) => (
           <div key={m.id} className="tf-card" style={{ padding: '1.25rem 1rem', textAlign: 'center' }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: `linear-gradient(135deg, ${CO.forest}, ${CO.river})`, margin: '0 auto .65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Playfair Display', serif", fontSize: '1rem', color: CO.gold, fontWeight: 700 }}>
-              {getInitials(m.name)}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '.65rem' }}>
+              <MemberAvatar name={m.name} photo={m.photo} size={56} />
             </div>
             <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '.88rem', fontWeight: 700, color: CO.forest, marginBottom: 2 }}>{m.name}</p>
             <p style={{ fontSize: 11, color: CO.muted, marginBottom: m.badge ? 5 : 10 }}>{m.role}</p>
@@ -695,6 +752,25 @@ function MembersPage({ members, setMembers, showToast }) {
       </div>
       {open && (
         <Modal title={editId ? 'Rediger medlem' : 'Nytt medlem'} onClose={() => setOpen(false)}>
+          <FormRow label="Profilbilde">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div className="photo-upload">
+                {form.photo
+                  ? <img src={form.photo} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 22 }}>📷</div>
+                      <div style={{ fontSize: 10, color: CO.muted, marginTop: 2 }}>Last opp</div>
+                    </div>
+                }
+                <input type="file" accept="image/*" onChange={handlePhoto} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 12, color: CO.muted, lineHeight: 1.5 }}>Klikk sirkelen for å laste opp bilde. Vises på medlemskortet.</p>
+                {uploading && <p style={{ fontSize: 12, color: CO.gold, marginTop: 4 }}>Laster opp…</p>}
+                {form.photo && <button onClick={() => f('photo', '')} style={{ fontSize: 12, color: '#c0392b', marginTop: 6, textDecoration: 'underline', cursor: 'pointer' }}>Fjern bilde</button>}
+              </div>
+            </div>
+          </FormRow>
           <FormRow label="Fullt navn"><TFInput value={form.name} onChange={(v) => f('name', v)} placeholder="Ola Nordmann" /></FormRow>
           <FormRow label="Rolle / tittel"><TFInput value={form.role} onChange={(v) => f('role', v)} placeholder="Medlem siden 2025" /></FormRow>
           <FormRow label="Badge (valgfri)"><TFSelect value={form.badge} onChange={(v) => f('badge', v)} options={MEMBER_BADGES.map((b) => ({ value: b, label: b || '— ingen badge —' }))} /></FormRow>
@@ -839,7 +915,6 @@ function RulesPage({ rules, setRules, showToast }) {
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(false)
   const [page, setPage] = useState('hjem')
-  const [ready, setReady] = useState(false)
   const [toastMsg, setToastMsg] = useState(null)
   const toastTimer = useRef(null)
 
@@ -850,26 +925,29 @@ export default function App() {
   const [rules, setRules] = useState(SEED.rules)
   const [catches, setCatches] = useState(SEED.catches)
 
-  // Load from Firebase on mount, then set up real-time listeners
+  // On mount: load from Firebase, seed if empty, then listen for real-time updates
   useEffect(() => {
     const KEYS = ['news', 'events', 'members', 'waters', 'rules', 'catches']
     const setters = { news: setNews, events: setEvents, members: setMembers, waters: setWaters, rules: setRules, catches: setCatches }
-    const seeds = SEED
 
+    // Load once, then seed if nothing in Firebase yet
     Promise.all(KEYS.map((k) => fbGet(k))).then((results) => {
       KEYS.forEach((k, i) => {
-        if (results[i]) setters[k](results[i])
-        else fbSet(k, seeds[k]) // first-time seed
+        if (results[i] && results[i].length > 0) {
+          setters[k](results[i])
+        } else {
+          // Nothing in Firebase yet — write seed data
+          fbSet(k, SEED[k])
+        }
       })
-      setReady(true)
     })
 
-    // Real-time sync: when any user saves, all tabs/devices update
+    // Real-time listeners — always reflect latest Firebase data
     const unsubs = KEYS.map((k) => fbListen(k, (data) => setters[k](data)))
     return () => unsubs.forEach((u) => u())
   }, [])
 
-  // Persist helper
+  // Persist to Firebase whenever state changes
   const makeSetter = (setter, key) => (val) => {
     setter((prev) => {
       const v = typeof val === 'function' ? val(prev) : val
@@ -891,14 +969,6 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToastMsg(null), 2500)
   }
 
-  if (!ready) {
-    return (
-      <div style={{ minHeight: '100dvh', background: CO.deep, display: 'flex', alignItems: 'center', justifyContent: 'center', color: CO.mist, fontFamily: "'Playfair Display', serif", fontSize: '1.2rem' }}>
-        Laster…
-      </div>
-    )
-  }
-
   if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />
 
   return (
@@ -918,7 +988,7 @@ export default function App() {
         <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1rem', color: CO.cream, marginBottom: 5 }}>
           Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua
         </p>
-        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Nøklevann, Bøler<br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
+        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Lillehammer, Innlandet<br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
       </footer>
 
       {toastMsg && <Toast message={toastMsg} />}
