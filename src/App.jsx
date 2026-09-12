@@ -988,7 +988,7 @@ export default function App() {
         <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1rem', color: CO.cream, marginBottom: 5 }}>
           Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua
         </p>
-        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Lillehammer, Innlandet<br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
+        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Nøklevann, Østmarka<br />Kontakt: vulgata-tom@solvkroken.no</p>
       </footer>
 
       {toastMsg && <Toast message={toastMsg} />}
