@@ -388,7 +388,7 @@ function HomePage({ news, events, members, waters, catches, onNavigate }) {
       <div className="tf-wrap">
         <div style={{ background: 'rgba(200,146,42,.1)', border: `1px solid rgba(200,146,42,.3)`, borderRadius: 8, padding: '.85rem 1.1rem', fontSize: 13.5, display: 'flex', gap: 10, marginBottom: '1.75rem' }}>
           <span style={{ color: CO.gold, flexShrink: 0 }}>📣</span>
-          <span><b>Sesongstart 2025:</b> Fisket åpner 1. juni. Husk å fornye fiskekortavtalen innen 15. mai via kasserer.</span>
+          <span><b>Sesongstart:</b> Fisket åpner 1. juni. Husk å fornye fiskekortavtalen innen 15. mai via kasserer.</span>
         </div>
         {topCatch && (
           <div style={{ background: CO.forest, borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
@@ -534,7 +534,7 @@ function EventsPage({ events, setEvents, showToast }) {
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
-        <div><p className="tf-label">Kalender</p><h2 className="tf-title">Arrangement 2025</h2></div>
+        <div><p className="tf-label">Kalender</p><h2 className="tf-title">Arrangementer</h2></div>
         <TFBtn variant="primary" onClick={openNew}>+ Nytt arrangement</TFBtn>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.7rem' }}>
@@ -998,7 +998,7 @@ export default function App() {
         <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1rem', color: CO.cream, marginBottom: 5 }}>
           Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua
         </p>
-        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Lillehammer, Innlandet<br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
+        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Nøklevann, Oslo <br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
       </footer>
 
       {toastMsg && <Toast message={toastMsg} />}
