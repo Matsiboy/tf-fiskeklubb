@@ -21,9 +21,9 @@ const SEED = {
     { id: 3, date: '2025-04-28', badge: 'Info', title: 'Ny parkeringsordning ved Langvann', text: 'Fra 1. juni innføres ny parkeringsordning. Parkering kun tillatt i merket område.', color: '#2d6a8f' },
   ],
   events: [
-    { id: 1, day: '07', month: 'Jun', title: 'Fluebinderkurs med Kjell Andersen', location: 'Klubbhuset, Lillehammer', time: '10:00–16:00', note: 'Maks 12 plasser', tag: 'Kurs' },
-    { id: 2, day: '14', month: 'Jun', title: 'Sesongåpningsfiske — Steinelva', location: 'Steinelva, nedre del', time: 'Start 07:00', note: 'Felles grillmat etterpå', tag: 'Sosialt' },
-    { id: 3, day: '06', month: 'Sep', title: 'Høstkonkurranse — Tordivelen Cup', location: 'Steinelva', time: 'Start 06:00', note: 'Premieutdeling kl. 19:00', tag: 'Konkurranse' },
+    { id: 1, day: '07', month: 'Jun', date: '2025-06-07', title: 'Fluebinderkurs med Kjell Andersen', location: 'Klubbhuset, Lillehammer', time: '10:00–16:00', note: 'Maks 12 plasser', tag: 'Kurs' },
+    { id: 2, day: '14', month: 'Jun', date: '2025-06-14', title: 'Sesongåpningsfiske — Steinelva', location: 'Steinelva, nedre del', time: 'Start 07:00', note: 'Felles grillmat etterpå', tag: 'Sosialt' },
+    { id: 3, day: '06', month: 'Sep', date: '2025-09-06', title: 'Høstkonkurranse — Tordivelen Cup', location: 'Steinelva', time: 'Start 06:00', note: 'Premieutdeling kl. 19:00', tag: 'Konkurranse' },
   ],
   members: [
     { id: 1, name: 'Erik Haugen', role: 'Leder', badge: 'Styre', photo: '' },
@@ -409,7 +409,7 @@ function HomePage({ news, events, members, waters, catches, onNavigate }) {
               <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.3rem', fontWeight: 700, color: CO.forest }}>Siste nyheter</h2>
               <button onClick={() => onNavigate('nyheter')} style={{ color: CO.river, fontWeight: 600, fontSize: 13 }}>Se alle →</button>
             </div>
-            {news.slice(0, 3).map((n) => (
+            {[...news].sort((a, b) => new Date(b.date || '0') - new Date(a.date || '0')).slice(0, 3).map((n) => (
               <div key={n.id} style={{ borderBottom: `1px solid ${CO.creamDk}`, paddingBottom: '.85rem', marginBottom: '.85rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                   <span style={{ background: CO.gold, color: CO.deep, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '2px 7px', borderRadius: 3 }}>{n.badge}</span>
@@ -425,7 +425,7 @@ function HomePage({ news, events, members, waters, catches, onNavigate }) {
               <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.3rem', fontWeight: 700, color: CO.forest }}>Kommende arrangement</h2>
               <button onClick={() => onNavigate('arrangement')} style={{ color: CO.river, fontWeight: 600, fontSize: 13 }}>Se alle →</button>
             </div>
-            {events.slice(0, 4).map((ev) => (
+            {[...events].sort((a, b) => new Date(a.date || '9999') - new Date(b.date || '9999')).slice(0, 4).map((ev) => (
               <div key={ev.id} style={{ display: 'flex', gap: '.8rem', borderBottom: `1px solid ${CO.creamDk}`, paddingBottom: '.85rem', marginBottom: '.85rem', alignItems: 'flex-start' }}>
                 <div style={{ background: CO.forest, color: CO.cream, borderRadius: 7, textAlign: 'center', padding: '5px 7px', lineHeight: 1, flexShrink: 0, minWidth: 44 }}>
                   <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.2rem', fontWeight: 700, color: CO.gold, display: 'block' }}>{ev.day}</span>
@@ -455,6 +455,7 @@ function NewsPage({ news, setNews, showToast }) {
   const [form, setForm] = useState(empty)
   const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+  const sortedNews = [...news].sort((a, b) => new Date(b.date || '0') - new Date(a.date || '0'))
   const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
   const openEdit = (item) => { setEditId(item.id); setForm({ ...item }); setOpen(true) }
   const save = () => {
@@ -470,7 +471,7 @@ function NewsPage({ news, setNews, showToast }) {
         <TFBtn variant="primary" onClick={openNew}>+ Ny nyhet</TFBtn>
       </div>
       <div className="tf-grid">
-        {news.map((n) => (
+        {sortedNews.map((n) => (
           <div key={n.id} className="tf-card">
             <div style={{ height: 110, background: `linear-gradient(135deg, ${n.color || CO.forest} 0%, ${CO.river} 100%)`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ position: 'absolute', top: 9, left: 9, background: CO.gold, color: CO.deep, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '2px 8px', borderRadius: 3 }}>{n.badge}</span>
@@ -515,12 +516,13 @@ const EVENT_TAGS = ['Kurs', 'Sosialt', 'Stevne', 'Konkurranse', 'Info', 'Dugnad'
 const TAG_STYLES = { Kurs: ['rgba(45,106,143,.12)', '#1a5070'], Sosialt: ['rgba(26,78,26,.12)', '#1a4a1a'], Stevne: ['rgba(200,146,42,.15)', '#5a3a00'], Konkurranse: ['rgba(180,50,50,.12)', '#4a1a1a'], Info: ['rgba(80,80,180,.12)', '#3a3a6a'], Dugnad: ['rgba(100,100,100,.12)', '#3a3a3a'] }
 
 function EventsPage({ events, setEvents, showToast }) {
-  const empty = { day: '', month: '', title: '', location: '', time: '', note: '', tag: 'Sosialt' }
+  const empty = { day: '', month: '', date: '', title: '', location: '', time: '', note: '', tag: 'Sosialt' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(empty)
   const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+  const sortedEvents = [...events].sort((a, b) => new Date(a.date || '9999') - new Date(b.date || '9999'))
   const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
   const openEdit = (ev) => { setEditId(ev.id); setForm({ ...ev }); setOpen(true) }
   const save = () => {
@@ -536,7 +538,7 @@ function EventsPage({ events, setEvents, showToast }) {
         <TFBtn variant="primary" onClick={openNew}>+ Nytt arrangement</TFBtn>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.7rem' }}>
-        {events.map((ev) => {
+        {sortedEvents.map((ev) => {
           const [bg, col] = TAG_STYLES[ev.tag] || TAG_STYLES.Info
           return (
             <div key={ev.id} className="tf-card" style={{ padding: '1rem', display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: '.9rem', alignItems: 'center' }}>
@@ -561,10 +563,18 @@ function EventsPage({ events, setEvents, showToast }) {
       </div>
       {open && (
         <Modal title={editId ? 'Rediger arrangement' : 'Nytt arrangement'} onClose={() => setOpen(false)}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <FormRow label="Dag"><TFInput value={form.day} onChange={(v) => f('day', v)} placeholder="07" /></FormRow>
-            <FormRow label="Måned"><TFInput value={form.month} onChange={(v) => f('month', v)} placeholder="Jun" /></FormRow>
-          </div>
+          <FormRow label="Dato"><TFInput value={form.date} onChange={(v) => {
+            f('date', v)
+            if (v) {
+              const d = new Date(v)
+              setForm((p) => ({
+                ...p,
+                date: v,
+                day: String(d.getDate()).padStart(2, '0'),
+                month: d.toLocaleString('nb-NO', { month: 'short' }).replace('.', '').replace(/^\w/, c => c.toUpperCase()),
+              }))
+            }
+          }} type="date" /></FormRow>
           <FormRow label="Tittel"><TFInput value={form.title} onChange={(v) => f('title', v)} placeholder="Arrangementsnavn" /></FormRow>
           <FormRow label="Sted"><TFInput value={form.location} onChange={(v) => f('location', v)} placeholder="Klubbhuset, Lillehammer" /></FormRow>
           <FormRow label="Tid"><TFInput value={form.time} onChange={(v) => f('time', v)} placeholder="10:00–14:00" /></FormRow>
@@ -988,7 +998,7 @@ export default function App() {
         <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1rem', color: CO.cream, marginBottom: 5 }}>
           Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua
         </p>
-        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Nøklevann, Østmarka<br />Kontakt: vulgata-tom@solvkroken.no</p>
+        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Lillehammer, Innlandet<br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
       </footer>
 
       {toastMsg && <Toast message={toastMsg} />}
