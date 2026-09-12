@@ -1,11 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { db } from './firebase.js'
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore'
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
 const CREDENTIALS = { medlem: 'stangfisker', admin: 'leder2025' }
 
-// ─── Colors ───────────────────────────────────────────────────────────────────
 const CO = {
   forest: '#1a2e1a', deep: '#0f1d0f', river: '#2d6a8f',
   gold: '#c8922a', goldLt: '#e0b050', cream: '#f5f0e8',
@@ -13,12 +11,11 @@ const CO = {
   white: '#ffffff', text: '#2a2a2a',
 }
 
-// ─── Seed data (only used if Firebase is completely empty) ────────────────────
 const SEED = {
   news: [
-    { id: 1, date: '2025-05-14', badge: 'Fangst', title: 'Årsrekord ørret fanget på Steinelva', text: 'Lars Holm satte ny klubbrekord med en 2,3 kg storvokst ørret. Fanget på en hjemmelaget caddis-flue i kveldstimene.', color: '#2d6a8f' },
-    { id: 2, date: '2025-05-02', badge: 'Kurs', title: 'Fluebinderkurs 7. juni — meld deg på nå', text: 'Kjell Andersen holder kurs i tradisjonell fluebinding. Maks 12 plasser. Inkludert materiell og kaffe.', color: '#1a2e1a' },
-    { id: 3, date: '2025-04-28', badge: 'Info', title: 'Ny parkeringsordning ved Langvann', text: 'Fra 1. juni innføres ny parkeringsordning. Parkering kun tillatt i merket område.', color: '#2d6a8f' },
+    { id: 1, date: '2025-05-14', badge: 'Fangst', title: 'Årsrekord ørret fanget på Steinelva', text: 'Lars Holm satte ny klubbrekord med en 2,3 kg storvokst ørret. Fanget på en hjemmelaget caddis-flue i kveldstimene.', color: '#2d6a8f', photo: '' },
+    { id: 2, date: '2025-05-02', badge: 'Kurs', title: 'Fluebinderkurs 7. juni', text: 'Kjell Andersen holder kurs i tradisjonell fluebinding. Maks 12 plasser.', color: '#1a2e1a', photo: '' },
+    { id: 3, date: '2025-04-28', badge: 'Info', title: 'Ny parkeringsordning ved Langvann', text: 'Fra 1. juni innføres ny parkeringsordning. Parkering kun tillatt i merket område.', color: '#2d6a8f', photo: '' },
   ],
   events: [
     { id: 1, day: '07', month: 'Jun', date: '2025-06-07', title: 'Fluebinderkurs med Kjell Andersen', location: 'Klubbhuset, Lillehammer', time: '10:00–16:00', note: 'Maks 12 plasser', tag: 'Kurs' },
@@ -55,56 +52,44 @@ const SEED = {
     { id: 3, angler: 'Marte Nygård', species: 'Ørret', weight: 1.8, length: 49, water: 'Langvann', method: 'Flue', date: '2025-07-03', note: 'Fanget fra båt' },
     { id: 4, angler: 'Erik Haugen', species: 'Harr', weight: 1.4, length: 46, water: 'Steinelva', method: 'Flue', date: '2025-06-20', note: '' },
   ],
+  merch: [],
 }
 
-// ─── Date helpers ─────────────────────────────────────────────────────────────
-// Format ISO date (2025-05-14) to Norwegian display (14. mai 2025)
 const NO_MONTHS = ['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember']
 function formatDate(iso) {
   if (!iso) return ''
-  // already formatted (legacy data like "14. mai 2025")
   if (iso.includes('.')) return iso
   const [y, m, d] = iso.split('-')
   if (!y || !m || !d) return iso
   return `${parseInt(d)}. ${NO_MONTHS[parseInt(m) - 1]} ${y}`
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const getInitials = (name) => name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 const nextId = (arr) => (arr.length ? Math.max(...arr.map((x) => x.id)) + 1 : 1)
 
-// ─── Firebase helpers ─────────────────────────────────────────────────────────
 async function fbGet(key) {
-  try {
-    const snap = await getDoc(doc(db, 'data', key))
-    return snap.exists() ? snap.data().items : null
-  } catch { return null }
+  try { const snap = await getDoc(doc(db, 'data', key)); return snap.exists() ? snap.data().items : null } catch { return null }
 }
 async function fbSet(key, value) {
   try { await setDoc(doc(db, 'data', key), { items: value }) } catch (e) { console.error(e) }
 }
 function fbListen(key, cb) {
-  return onSnapshot(doc(db, 'data', key), (snap) => {
-    if (snap.exists()) cb(snap.data().items)
-  }, (err) => console.error('Listen error:', err))
+  return onSnapshot(doc(db, 'data', key), (snap) => { if (snap.exists()) cb(snap.data().items) }, (err) => console.error(err))
 }
 
-// ─── Image to base64 ─────────────────────────────────────────────────────────
-function fileToBase64(file) {
+function fileToBase64(file, maxSize = 600) {
   return new Promise((resolve, reject) => {
-    // Resize before storing to keep Firebase doc small
     const reader = new FileReader()
     reader.onload = (e) => {
       const img = new Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
-        const MAX = 200
         let w = img.width, h = img.height
-        if (w > h) { if (w > MAX) { h = h * MAX / w; w = MAX } }
-        else { if (h > MAX) { w = w * MAX / h; h = MAX } }
+        if (w > h) { if (w > maxSize) { h = h * maxSize / w; w = maxSize } }
+        else { if (h > maxSize) { w = w * maxSize / h; h = maxSize } }
         canvas.width = w; canvas.height = h
         canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-        resolve(canvas.toDataURL('image/jpeg', 0.7))
+        resolve(canvas.toDataURL('image/jpeg', 0.75))
       }
       img.src = e.target.result
     }
@@ -113,152 +98,128 @@ function fileToBase64(file) {
   })
 }
 
-// ─── Global CSS ───────────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Inter:wght@400;500;600&display=swap');
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', sans-serif; background: #f5f0e8; color: #2a2a2a; -webkit-tap-highlight-color: transparent; }
-  button, input, textarea, select { font-family: inherit; }
-  button { cursor: pointer; border: none; background: none; }
-  .tf-input { width: 100%; padding: 9px 12px; border: 1px solid #d0c8b8; border-radius: 6px; font-size: 14px; background: #fff; color: #2a2a2a; outline: none; box-sizing: border-box; }
-  .tf-input:focus { border-color: #c8922a; }
-  textarea.tf-input { resize: vertical; min-height: 72px; }
-  input[type="date"].tf-input { cursor: pointer; }
-  .tf-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; border: 1px solid transparent; transition: opacity .15s, transform .1s; cursor: pointer; }
-  .tf-btn:active { transform: scale(.97); }
-  .tf-primary { background: #c8922a; color: #0f1d0f; border-color: #c8922a; }
-  .tf-primary:hover { opacity: .9; }
-  .tf-ghost { background: transparent; color: #6b7c6b; border-color: #ddd; }
-  .tf-ghost:hover { background: #f0ebe0; }
-  .tf-danger { background: rgba(220,60,60,.08); color: #c0392b; border-color: rgba(220,60,60,.2); }
-  .tf-forest { background: #1a2e1a; color: #f5f0e8; }
-  .tf-sm { padding: 4px 9px; font-size: 12px; }
-  .tf-card { background: #fff; border: 1px solid #e8e0d0; border-radius: 10px; overflow: hidden; }
-  .tf-wrap { max-width: 1100px; margin: 0 auto; padding: 1.75rem 1rem; }
-  .tf-ph { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: .75rem; }
-  .tf-label { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: #c8922a; margin-bottom: 4px; }
-  .tf-title { font-family: 'Playfair Display', serif; font-size: clamp(1.5rem, 4vw, 2.1rem); font-weight: 700; color: #1a2e1a; line-height: 1.15; }
-  .tf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
-  .tf-grid-sm { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 1rem; }
-  .tf-flabel { display: block; font-size: 12px; font-weight: 600; color: #6b7c6b; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .06em; }
-  .tf-frow { margin-bottom: 1rem; }
-  .tf-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 8px; border-radius: 20px; }
-  .tf-badge-gold { background: rgba(200,146,42,.15); color: #c8922a; border: 1px solid rgba(200,146,42,.3); }
-  .tf-badge-blue { background: rgba(45,106,143,.12); color: #1a5070; border: 1px solid rgba(45,106,143,.25); }
-  .tf-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 600; display: flex; align-items: center; justify-content: center; padding: 1rem; }
-  .tf-modal { background: #f5f0e8; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 460px; max-height: 90dvh; overflow-y: auto; }
-  .tf-nav-desktop { display: flex; gap: 1px; }
-  .tf-hamburger { display: none !important; }
-  .photo-upload { width: 80px; height: 80px; border-radius: 50%; border: 2px dashed #d0c8b8; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative; transition: border-color .2s; }
-  .photo-upload:hover { border-color: #c8922a; }
-  .photo-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  @media (max-width: 640px) {
-    .tf-wrap { padding: 1.25rem .75rem; }
-    .tf-nav-desktop { display: none !important; }
-    .tf-hamburger { display: flex !important; }
-    .tf-grid { grid-template-columns: 1fr; }
-    .tf-grid-sm { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
-    .tf-ev-tag { display: none !important; }
-    .tf-modal { padding: 1.25rem; }
-    .tf-home-cols { grid-template-columns: 1fr !important; }
-    .tf-podium { grid-template-columns: 1fr 1fr !important; }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif;background:#f5f0e8;color:#2a2a2a;-webkit-tap-highlight-color:transparent;}
+  button,input,textarea,select{font-family:inherit;}
+  button{cursor:pointer;border:none;background:none;}
+  .tf-input{width:100%;padding:9px 12px;border:1px solid #d0c8b8;border-radius:6px;font-size:14px;background:#fff;color:#2a2a2a;outline:none;box-sizing:border-box;}
+  .tf-input:focus{border-color:#c8922a;}
+  textarea.tf-input{resize:vertical;min-height:72px;}
+  input[type="date"].tf-input{cursor:pointer;}
+  .tf-btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:6px;font-weight:600;font-size:13px;border:1px solid transparent;transition:opacity .15s,transform .1s;cursor:pointer;}
+  .tf-btn:active{transform:scale(.97);}
+  .tf-primary{background:#c8922a;color:#0f1d0f;border-color:#c8922a;}
+  .tf-primary:hover{opacity:.9;}
+  .tf-ghost{background:transparent;color:#6b7c6b;border-color:#ddd;}
+  .tf-ghost:hover{background:#f0ebe0;}
+  .tf-danger{background:rgba(220,60,60,.08);color:#c0392b;border-color:rgba(220,60,60,.2);}
+  .tf-forest{background:#1a2e1a;color:#f5f0e8;}
+  .tf-sm{padding:4px 9px;font-size:12px;}
+  .tf-card{background:#fff;border:1px solid #e8e0d0;border-radius:10px;overflow:hidden;}
+  .tf-wrap{max-width:1100px;margin:0 auto;padding:1.75rem 1rem;}
+  .tf-ph{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem;}
+  .tf-label{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#c8922a;margin-bottom:4px;}
+  .tf-title{font-family:'Playfair Display',serif;font-size:clamp(1.5rem,4vw,2.1rem);font-weight:700;color:#1a2e1a;line-height:1.15;}
+  .tf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;}
+  .tf-grid-sm{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:1rem;}
+  .tf-flabel{display:block;font-size:12px;font-weight:600;color:#6b7c6b;margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em;}
+  .tf-frow{margin-bottom:1rem;}
+  .tf-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border-radius:20px;}
+  .tf-badge-gold{background:rgba(200,146,42,.15);color:#c8922a;border:1px solid rgba(200,146,42,.3);}
+  .tf-badge-blue{background:rgba(45,106,143,.12);color:#1a5070;border:1px solid rgba(45,106,143,.25);}
+  .tf-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem;}
+  .tf-modal{background:#f5f0e8;border-radius:12px;padding:1.5rem;width:100%;max-width:460px;max-height:90dvh;overflow-y:auto;}
+  .tf-nav-desktop{display:flex;gap:1px;}
+  .tf-hamburger{display:none!important;}
+  .photo-upload{border:2px dashed #d0c8b8;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;transition:border-color .2s;background:#faf7f2;}
+  .photo-upload:hover{border-color:#c8922a;}
+  .photo-upload input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .photo-upload.circle{border-radius:50%;width:80px;height:80px;}
+  .photo-upload.rect{width:100%;height:160px;}
+  /* GAME */
+  .game-canvas{background:linear-gradient(180deg,#1a4a6e 0%,#2d6a8f 40%,#1a3a5e 100%);border-radius:12px;position:relative;overflow:hidden;cursor:crosshair;user-select:none;-webkit-user-select:none;}
+  .fish{position:absolute;font-size:28px;transition:none;pointer-events:none;}
+  .splash{position:absolute;pointer-events:none;font-size:20px;animation:splash .6s ease-out forwards;}
+  @keyframes splash{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(2.5) translateY(-20px)}}
+  .bobber{position:absolute;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ff6b6b,#cc0000);border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;transition:top .15s ease;}
+  .water-line{position:absolute;left:0;right:0;height:3px;background:rgba(255,255,255,.3);}
+  @media(max-width:640px){
+    .tf-wrap{padding:1.25rem .75rem;}
+    .tf-nav-desktop{display:none!important;}
+    .tf-hamburger{display:flex!important;}
+    .tf-grid{grid-template-columns:1fr;}
+    .tf-grid-sm{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
+    .tf-ev-tag{display:none!important;}
+    .tf-modal{padding:1.25rem;}
+    .tf-home-cols{grid-template-columns:1fr!important;}
+    .tf-podium{grid-template-columns:1fr 1fr!important;}
   }
 `
 
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 function TFBtn({ children, variant = 'ghost', small = false, onClick, style = {} }) {
-  const cls = ['tf-btn',
-    variant === 'primary' ? 'tf-primary' : variant === 'danger' ? 'tf-danger' : variant === 'forest' ? 'tf-forest' : 'tf-ghost',
-    small ? 'tf-sm' : ''
-  ].join(' ')
+  const cls = ['tf-btn', variant === 'primary' ? 'tf-primary' : variant === 'danger' ? 'tf-danger' : variant === 'forest' ? 'tf-forest' : 'tf-ghost', small ? 'tf-sm' : ''].join(' ')
   return <button className={cls} onClick={onClick} style={style}>{children}</button>
 }
-
 function TFInput({ value, onChange, placeholder, multiline = false, type = 'text', style = {} }) {
   if (multiline) return <textarea className="tf-input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} style={style} />
   return <input className="tf-input" type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} style={style} />
 }
-
 function TFSelect({ value, onChange, options }) {
-  return (
-    <select className="tf-input" value={value} onChange={(e) => onChange(e.target.value)}>
-      {options.map((o) => {
-        const val = typeof o === 'object' ? o.value : o
-        const lbl = typeof o === 'object' ? o.label : o
-        return <option key={val} value={val}>{lbl}</option>
-      })}
-    </select>
-  )
+  return <select className="tf-input" value={value} onChange={(e) => onChange(e.target.value)}>{options.map((o) => { const val = typeof o === 'object' ? o.value : o; const lbl = typeof o === 'object' ? o.label : o; return <option key={val} value={val}>{lbl}</option> })}</select>
 }
-
-function FormRow({ label, children }) {
-  return <div className="tf-frow"><label className="tf-flabel">{label}</label>{children}</div>
-}
-
+function FormRow({ label, children }) { return <div className="tf-frow"><label className="tf-flabel">{label}</label>{children}</div> }
 function Modal({ title, onClose, children }) {
-  return (
-    <div className="tf-modal-bg" onClick={onClose}>
-      <div className="tf-modal" onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <strong style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: CO.forest }}>{title}</strong>
-          <button onClick={onClose} style={{ fontSize: 22, color: CO.muted, lineHeight: 1, padding: '0 4px' }}>×</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
+  return <div className="tf-modal-bg" onClick={onClose}><div className="tf-modal" onClick={(e) => e.stopPropagation()}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}><strong style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, color: CO.forest }}>{title}</strong><button onClick={onClose} style={{ fontSize: 22, color: CO.muted, lineHeight: 1, padding: '0 4px' }}>×</button></div>{children}</div></div>
 }
-
 function ConfirmDialog({ message, onConfirm, onCancel }) {
-  return (
-    <Modal title="Bekreft sletting" onClose={onCancel}>
-      <p style={{ fontSize: 14, marginBottom: '1.5rem', color: CO.text }}>{message}</p>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <TFBtn onClick={onCancel}>Avbryt</TFBtn>
-        <TFBtn variant="danger" onClick={onConfirm}>Slett</TFBtn>
-      </div>
-    </Modal>
-  )
+  return <Modal title="Bekreft sletting" onClose={onCancel}><p style={{ fontSize: 14, marginBottom: '1.5rem' }}>{message}</p><div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><TFBtn onClick={onCancel}>Avbryt</TFBtn><TFBtn variant="danger" onClick={onConfirm}>Slett</TFBtn></div></Modal>
 }
-
 function Toast({ message }) {
-  return (
-    <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: CO.forest, color: CO.cream, padding: '10px 22px', borderRadius: 8, fontSize: 14, fontWeight: 500, zIndex: 9999, border: `1px solid ${CO.gold}`, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-      ✓ {message}
-    </div>
-  )
+  return <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: CO.forest, color: CO.cream, padding: '10px 22px', borderRadius: 8, fontSize: 14, fontWeight: 500, zIndex: 9999, border: `1px solid ${CO.gold}`, whiteSpace: 'nowrap', pointerEvents: 'none' }}>✓ {message}</div>
 }
-
 function TagPill({ label, onRemove }) {
-  return (
-    <span className="tf-badge tf-badge-blue" style={{ gap: 4, marginRight: 4, marginBottom: 4 }}>
-      {label}
-      {onRemove && <span onClick={onRemove} style={{ cursor: 'pointer', marginLeft: 2, opacity: .7, fontWeight: 700, fontSize: 13 }}>×</span>}
-    </span>
-  )
+  return <span className="tf-badge tf-badge-blue" style={{ gap: 4, marginRight: 4, marginBottom: 4 }}>{label}{onRemove && <span onClick={onRemove} style={{ cursor: 'pointer', marginLeft: 2, opacity: .7, fontWeight: 700, fontSize: 13 }}>×</span>}</span>
+}
+function MemberAvatar({ name, photo, size = 48 }) {
+  if (photo) return <img src={photo} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+  return <div style={{ width: size, height: size, borderRadius: '50%', background: `linear-gradient(135deg,${CO.forest},${CO.river})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Playfair Display',serif", fontSize: size * 0.33, color: CO.gold, fontWeight: 700, flexShrink: 0 }}>{getInitials(name)}</div>
 }
 
-// Member avatar — shows photo if available, else initials
-function MemberAvatar({ name, photo, size = 48 }) {
-  if (photo) {
-    return <img src={photo} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+// Photo upload helper component
+function PhotoUpload({ photo, onPhoto, onClear, circle = false, label = 'Last opp bilde' }) {
+  const [uploading, setUploading] = useState(false)
+  const handleFile = async (e) => {
+    const file = e.target.files[0]; if (!file) return
+    setUploading(true)
+    try { const b64 = await fileToBase64(file, circle ? 200 : 800); onPhoto(b64) } catch {}
+    setUploading(false)
   }
   return (
-    <div style={{ width: size, height: size, borderRadius: '50%', background: `linear-gradient(135deg, ${CO.forest}, ${CO.river})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Playfair Display', serif", fontSize: size * 0.33, color: CO.gold, fontWeight: 700, flexShrink: 0 }}>
-      {getInitials(name)}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className={`photo-upload ${circle ? 'circle' : 'rect'}`} style={circle ? {} : { flex: 1, height: 120 }}>
+        {photo
+          ? <img src={photo} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <div style={{ textAlign: 'center', padding: '1rem' }}><div style={{ fontSize: circle ? 22 : 30 }}>📷</div><div style={{ fontSize: 11, color: CO.muted, marginTop: 4 }}>{label}</div></div>
+        }
+        <input type="file" accept="image/*" onChange={handleFile} />
+      </div>
+      {circle && <div style={{ flex: 1 }}>
+        <p style={{ fontSize: 12, color: CO.muted, lineHeight: 1.5 }}>Klikk for å laste opp bilde.</p>
+        {uploading && <p style={{ fontSize: 12, color: CO.gold, marginTop: 4 }}>Laster opp…</p>}
+        {photo && <button onClick={onClear} style={{ fontSize: 12, color: '#c0392b', marginTop: 6, textDecoration: 'underline', cursor: 'pointer' }}>Fjern bilde</button>}
+      </div>}
+      {!circle && uploading && <p style={{ fontSize: 12, color: CO.gold }}>Laster…</p>}
     </div>
   )
 }
 
 // ─── Login ────────────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState(false)
-  const attempt = () => {
-    if (CREDENTIALS[username.trim().toLowerCase()] === password) { onLogin() }
-    else { setError(true); setPassword('') }
-  }
+  const [username, setUsername] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(false)
+  const attempt = () => { if (CREDENTIALS[username.trim().toLowerCase()] === password) onLogin(); else { setError(true); setPassword('') } }
   return (
     <div style={{ minHeight: '100dvh', background: CO.deep, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
       <div style={{ background: CO.forest, border: `1px solid rgba(200,146,42,.3)`, borderRadius: 14, padding: '2.5rem 2rem', width: '100%', maxWidth: 380, textAlign: 'center' }}>
@@ -272,27 +233,17 @@ function LoginScreen({ onLogin }) {
           <path d="M48 28 Q52 24 50 20" stroke={CO.goldLt} strokeWidth="1" fill="none" opacity=".7" />
           <ellipse cx="40" cy="65" rx="18" ry="3" stroke="#4a8fb5" strokeWidth="1" fill="none" opacity=".5" />
         </svg>
-        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.5rem', color: CO.cream, marginBottom: '.2rem' }}>
-          Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua
-        </h1>
+        <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.cream, marginBottom: '.2rem' }}>Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua</h1>
         <p style={{ fontStyle: 'italic', color: CO.mist, marginBottom: '1.75rem', opacity: .8, fontSize: 14 }}>Fiskeklubb — Medlemsportal</p>
-        <div style={{ textAlign: 'left', marginBottom: '.85rem' }}>
-          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: CO.mist, marginBottom: 4 }}>Brukernavn</label>
-          <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && attempt()}
-            style={{ width: '100%', background: 'rgba(255,255,255,.06)', border: `1px solid ${error ? 'rgba(220,80,80,.5)' : 'rgba(200,146,42,.25)'}`, borderRadius: 6, padding: '10px 13px', color: CO.cream, fontSize: 15, outline: 'none', fontFamily: 'inherit' }} />
-        </div>
-        <div style={{ textAlign: 'left', marginBottom: '.85rem' }}>
-          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: CO.mist, marginBottom: 4 }}>Passord</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && attempt()}
-            style={{ width: '100%', background: 'rgba(255,255,255,.06)', border: `1px solid ${error ? 'rgba(220,80,80,.5)' : 'rgba(200,146,42,.25)'}`, borderRadius: 6, padding: '10px 13px', color: CO.cream, fontSize: 15, outline: 'none', fontFamily: 'inherit' }} />
-        </div>
+        {[['Brukernavn', username, setUsername, 'text'], ['Passord', password, setPassword, 'password']].map(([lbl, val, set, type]) => (
+          <div key={lbl} style={{ textAlign: 'left', marginBottom: '.85rem' }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: CO.mist, marginBottom: 4 }}>{lbl}</label>
+            <input type={type} value={val} onChange={(e) => set(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && attempt()} style={{ width: '100%', background: 'rgba(255,255,255,.06)', border: `1px solid ${error ? 'rgba(220,80,80,.5)' : 'rgba(200,146,42,.25)'}`, borderRadius: 6, padding: '10px 13px', color: CO.cream, fontSize: 15, outline: 'none', fontFamily: 'inherit' }} />
+          </div>
+        ))}
         {error && <p style={{ color: '#e07070', fontSize: 13, marginBottom: 8 }}>Feil brukernavn eller passord.</p>}
-        <button onClick={attempt} style={{ width: '100%', background: CO.gold, color: CO.deep, border: 'none', borderRadius: 6, padding: 12, fontWeight: 700, fontSize: 14, marginTop: 4, fontFamily: 'inherit', cursor: 'pointer' }}>
-          Logg inn
-        </button>
-        <p style={{ marginTop: '1.25rem', fontSize: 12, color: 'rgba(245,240,232,.35)', borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: '1rem' }}>
-          Kontakt styret for innloggingsinfo
-        </p>
+        <button onClick={attempt} style={{ width: '100%', background: CO.gold, color: CO.deep, border: 'none', borderRadius: 6, padding: 12, fontWeight: 700, fontSize: 14, marginTop: 4, fontFamily: 'inherit', cursor: 'pointer' }}>Logg inn</button>
+        <p style={{ marginTop: '1.25rem', fontSize: 12, color: 'rgba(245,240,232,.35)', borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: '1rem' }}>Kontakt styret for innloggingsinfo</p>
       </div>
     </div>
   )
@@ -302,47 +253,30 @@ function LoginScreen({ onLogin }) {
 const NAV_ITEMS = [
   { id: 'hjem', label: 'Hjem' }, { id: 'nyheter', label: 'Nyheter' },
   { id: 'arrangement', label: 'Arrangement' }, { id: 'fiskevann', label: 'Fiskevann' },
-  { id: 'toppliste', label: 'Toppliste' }, { id: 'regler', label: 'Regler' },
-  { id: 'medlemmer', label: 'Medlemmer' },
+  { id: 'toppliste', label: 'Toppliste' }, { id: 'merch', label: 'Merch' },
+  { id: 'regler', label: 'Regler' }, { id: 'medlemmer', label: 'Medlemmer' },
+  { id: 'spill', label: '🎮 Spill' },
 ]
-
 function SiteNav({ currentPage, onNavigate, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   return (
     <nav style={{ background: CO.forest, borderBottom: `2px solid ${CO.gold}`, position: 'sticky', top: 0, zIndex: 200 }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
         <button onClick={() => { onNavigate('hjem'); setMobileOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
-            <circle cx="18" cy="18" r="17" stroke={CO.gold} strokeWidth="1.2" />
-            <ellipse cx="18" cy="14" rx="7" ry="3" fill={CO.river} opacity=".9" />
-            <path d="M18 17 L18 27 Q18 31 22 31 Q26 31 26 27" stroke={CO.gold} strokeWidth="1.5" fill="none" strokeLinecap="round" />
-          </svg>
-          <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '1rem', color: CO.cream }}>T<span style={{ color: CO.gold }}>&</span>F</span>
+          <svg width="28" height="28" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="17" stroke={CO.gold} strokeWidth="1.2" /><ellipse cx="18" cy="14" rx="7" ry="3" fill={CO.river} opacity=".9" /><path d="M18 17 L18 27 Q18 31 22 31 Q26 31 26 27" stroke={CO.gold} strokeWidth="1.5" fill="none" strokeLinecap="round" /></svg>
+          <span style={{ fontFamily: "'Playfair Display',serif", fontSize: '1rem', color: CO.cream }}>T<span style={{ color: CO.gold }}>&</span>F</span>
         </button>
-        <div className="tf-nav-desktop">
-          {NAV_ITEMS.map((n) => (
-            <button key={n.id} onClick={() => onNavigate(n.id)}
-              style={{ color: currentPage === n.id ? CO.gold : CO.mist, fontWeight: 500, fontSize: 13, padding: '6px 9px', borderRadius: 5 }}>
-              {n.label}
-            </button>
-          ))}
+        <div className="tf-nav-desktop" style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
+          {NAV_ITEMS.map((n) => <button key={n.id} onClick={() => onNavigate(n.id)} style={{ color: currentPage === n.id ? CO.gold : CO.mist, fontWeight: 500, fontSize: 12, padding: '6px 8px', borderRadius: 5 }}>{n.label}</button>)}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={onLogout} style={{ border: `1px solid rgba(200,146,42,.4)`, color: CO.gold, fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 6 }}>Logg ut</button>
-          <button className="tf-hamburger" onClick={() => setMobileOpen((o) => !o)}
-            style={{ color: CO.mist, fontSize: 22, lineHeight: 1, padding: '4px 2px' }}>
-            {mobileOpen ? '✕' : '☰'}
-          </button>
+          <button className="tf-hamburger" onClick={() => setMobileOpen((o) => !o)} style={{ color: CO.mist, fontSize: 22, lineHeight: 1, padding: '4px 2px' }}>{mobileOpen ? '✕' : '☰'}</button>
         </div>
       </div>
       {mobileOpen && (
         <div style={{ background: CO.forest, borderTop: `1px solid rgba(200,146,42,.2)`, padding: '.5rem 1rem 1rem' }}>
-          {NAV_ITEMS.map((n) => (
-            <button key={n.id} onClick={() => { onNavigate(n.id); setMobileOpen(false) }}
-              style={{ display: 'block', width: '100%', textAlign: 'left', color: currentPage === n.id ? CO.gold : CO.mist, fontWeight: 500, fontSize: 15, padding: '10px 8px', borderRadius: 6, borderBottom: `1px solid rgba(255,255,255,.05)` }}>
-              {n.label}
-            </button>
-          ))}
+          {NAV_ITEMS.map((n) => <button key={n.id} onClick={() => { onNavigate(n.id); setMobileOpen(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', color: currentPage === n.id ? CO.gold : CO.mist, fontWeight: 500, fontSize: 15, padding: '10px 8px', borderRadius: 6, borderBottom: `1px solid rgba(255,255,255,.05)` }}>{n.label}</button>)}
         </div>
       )}
     </nav>
@@ -353,25 +287,18 @@ function SiteNav({ currentPage, onNavigate, onLogout }) {
 function Hero({ memberCount, waterCount }) {
   return (
     <div style={{ background: CO.forest, position: 'relative', minHeight: 340, display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 60% at 70% 0%, rgba(45,106,143,.25) 0%, transparent 60%), linear-gradient(180deg, #0f1d0f 0%, #1a2e1a 50%, #142814 100%)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 60% at 70% 0%,rgba(45,106,143,.25) 0%,transparent 60%),linear-gradient(180deg,#0f1d0f 0%,#1a2e1a 50%,#142814 100%)' }} />
       <svg style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, opacity: .35 }} viewBox="0 0 1200 100" preserveAspectRatio="none">
         <defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2d6a8f" stopOpacity=".6" /><stop offset="100%" stopColor="#2d6a8f" stopOpacity="0" /></linearGradient></defs>
         <path d="M0 40 Q150 10 300 40 Q450 70 600 30 Q750 0 900 35 Q1050 70 1200 25 L1200 100 L0 100Z" fill="url(#wg)" />
       </svg>
       <div style={{ position: 'relative', zIndex: 2, maxWidth: 1100, margin: '0 auto', padding: '3.5rem 1rem 2.5rem', width: '100%' }}>
         <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: CO.gold, marginBottom: '.75rem' }}>Stiftet 1987 — Innlandet, Norge</p>
-        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 'clamp(2rem, 6vw, 3.8rem)', fontWeight: 900, color: CO.cream, lineHeight: 1.05, marginBottom: '1rem' }}>
-          Der stangen møter<br /><em style={{ color: CO.gold }}>stille vann.</em>
-        </h1>
-        <p style={{ fontSize: 'clamp(.9rem, 2.5vw, 1.05rem)', color: CO.mist, maxWidth: 440, lineHeight: 1.65, marginBottom: '1.5rem' }}>
-          Tordivelen & Flugua er en fiskeklubb for de som elsker elva, fjellet og kunsten å presentere en flue.
-        </p>
+        <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(2rem,6vw,3.8rem)', fontWeight: 900, color: CO.cream, lineHeight: 1.05, marginBottom: '1rem' }}>Der stangen møter<br /><em style={{ color: CO.gold }}>stille vann.</em></h1>
+        <p style={{ fontSize: 'clamp(.9rem,2.5vw,1.05rem)', color: CO.mist, maxWidth: 440, lineHeight: 1.65, marginBottom: '1.5rem' }}>Tordivelen & Flugua er en fiskeklubb for de som elsker elva, fjellet og kunsten å presentere en flue.</p>
         <div style={{ display: 'flex', gap: '1.75rem', flexWrap: 'wrap' }}>
           {[[memberCount, 'Aktive medlemmer'], [waterCount, 'Fiskevann'], ['38', 'År med tradisjon']].map(([n, l]) => (
-            <div key={l}>
-              <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.75rem', fontWeight: 700, color: CO.gold, display: 'block' }}>{n}</span>
-              <span style={{ fontSize: 11, color: CO.mist, textTransform: 'uppercase', letterSpacing: '.08em' }}>{l}</span>
-            </div>
+            <div key={l}><span style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.75rem', fontWeight: 700, color: CO.gold, display: 'block' }}>{n}</span><span style={{ fontSize: 11, color: CO.mist, textTransform: 'uppercase', letterSpacing: '.08em' }}>{l}</span></div>
           ))}
         </div>
       </div>
@@ -388,25 +315,23 @@ function HomePage({ news, events, members, waters, catches, onNavigate }) {
       <div className="tf-wrap">
         <div style={{ background: 'rgba(200,146,42,.1)', border: `1px solid rgba(200,146,42,.3)`, borderRadius: 8, padding: '.85rem 1.1rem', fontSize: 13.5, display: 'flex', gap: 10, marginBottom: '1.75rem' }}>
           <span style={{ color: CO.gold, flexShrink: 0 }}>📣</span>
-          <span><b>Sesongstart:</b> Fisket åpner 1. juni. Husk å fornye fiskekortavtalen innen 15. mai via kasserer.</span>
+          <span><b>Sesongstart 2025:</b> Fisket åpner 1. juni. Husk å fornye fiskekortavtalen innen 15. mai via kasserer.</span>
         </div>
         {topCatch && (
           <div style={{ background: CO.forest, borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '1.75rem' }}>🏆</span>
             <div style={{ flex: 1 }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: CO.gold, marginBottom: 2 }}>Sesongens rekord</p>
-              <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: CO.cream, fontSize: '1rem' }}>{topCatch.angler} — {topCatch.weight} kg {topCatch.species}</p>
+              <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, color: CO.cream, fontSize: '1rem' }}>{topCatch.angler} — {topCatch.weight} kg {topCatch.species}</p>
               <p style={{ fontSize: 12, color: CO.mist, opacity: .8 }}>{topCatch.water} · {formatDate(topCatch.date)}</p>
             </div>
-            <button onClick={() => onNavigate('toppliste')} style={{ border: `1px solid rgba(200,146,42,.4)`, color: CO.gold, fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 6, whiteSpace: 'nowrap' }}>
-              Se toppliste →
-            </button>
+            <button onClick={() => onNavigate('toppliste')} style={{ border: `1px solid rgba(200,146,42,.4)`, color: CO.gold, fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 6, whiteSpace: 'nowrap' }}>Se toppliste →</button>
           </div>
         )}
         <div className="tf-home-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem' }}>
-              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.3rem', fontWeight: 700, color: CO.forest }}>Siste nyheter</h2>
+              <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.3rem', fontWeight: 700, color: CO.forest }}>Siste nyheter</h2>
               <button onClick={() => onNavigate('nyheter')} style={{ color: CO.river, fontWeight: 600, fontSize: 13 }}>Se alle →</button>
             </div>
             {[...news].sort((a, b) => new Date(b.date || '0') - new Date(a.date || '0')).slice(0, 3).map((n) => (
@@ -415,24 +340,24 @@ function HomePage({ news, events, members, waters, catches, onNavigate }) {
                   <span style={{ background: CO.gold, color: CO.deep, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '2px 7px', borderRadius: 3 }}>{n.badge}</span>
                   <span style={{ fontSize: 11, color: CO.muted }}>{formatDate(n.date)}</span>
                 </div>
-                <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: CO.forest, marginBottom: 2, fontSize: '.93rem' }}>{n.title}</p>
+                <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, color: CO.forest, marginBottom: 2, fontSize: '.93rem' }}>{n.title}</p>
                 <p style={{ fontSize: 13, color: CO.muted, lineHeight: 1.6 }}>{n.text}</p>
               </div>
             ))}
           </div>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem' }}>
-              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.3rem', fontWeight: 700, color: CO.forest }}>Kommende arrangement</h2>
+              <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.3rem', fontWeight: 700, color: CO.forest }}>Kommende arrangement</h2>
               <button onClick={() => onNavigate('arrangement')} style={{ color: CO.river, fontWeight: 600, fontSize: 13 }}>Se alle →</button>
             </div>
             {[...events].sort((a, b) => new Date(a.date || '9999') - new Date(b.date || '9999')).slice(0, 4).map((ev) => (
               <div key={ev.id} style={{ display: 'flex', gap: '.8rem', borderBottom: `1px solid ${CO.creamDk}`, paddingBottom: '.85rem', marginBottom: '.85rem', alignItems: 'flex-start' }}>
                 <div style={{ background: CO.forest, color: CO.cream, borderRadius: 7, textAlign: 'center', padding: '5px 7px', lineHeight: 1, flexShrink: 0, minWidth: 44 }}>
-                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.2rem', fontWeight: 700, color: CO.gold, display: 'block' }}>{ev.day}</span>
+                  <span style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.2rem', fontWeight: 700, color: CO.gold, display: 'block' }}>{ev.day}</span>
                   <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.08em', opacity: .8 }}>{ev.month}</span>
                 </div>
                 <div>
-                  <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: CO.forest, marginBottom: 2, fontSize: '.9rem' }}>{ev.title}</p>
+                  <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, color: CO.forest, marginBottom: 2, fontSize: '.9rem' }}>{ev.title}</p>
                   <p style={{ fontSize: 12, color: CO.muted }}>📍 {ev.location} · {ev.time}</p>
                 </div>
               </div>
@@ -449,7 +374,7 @@ const NEWS_BADGES = ['Nyhet', 'Fangst', 'Kurs', 'Styre', 'Miljø', 'Info', 'Seso
 const NEWS_COLORS = [CO.forest, CO.river, '#3a5a3a', '#6b4a1a']
 
 function NewsPage({ news, setNews, showToast }) {
-  const empty = { date: '', badge: 'Nyhet', title: '', text: '', color: CO.river }
+  const empty = { date: '', badge: 'Nyhet', title: '', text: '', color: CO.river, photo: '' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(empty)
@@ -457,7 +382,7 @@ function NewsPage({ news, setNews, showToast }) {
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
   const sortedNews = [...news].sort((a, b) => new Date(b.date || '0') - new Date(a.date || '0'))
   const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
-  const openEdit = (item) => { setEditId(item.id); setForm({ ...item }); setOpen(true) }
+  const openEdit = (item) => { setEditId(item.id); setForm({ ...item, photo: item.photo || '' }); setOpen(true) }
   const save = () => {
     if (!form.title.trim()) return
     const updated = editId ? news.map((n) => n.id === editId ? { ...form, id: editId } : n) : [{ ...form, id: nextId(news) }, ...news]
@@ -473,13 +398,17 @@ function NewsPage({ news, setNews, showToast }) {
       <div className="tf-grid">
         {sortedNews.map((n) => (
           <div key={n.id} className="tf-card">
-            <div style={{ height: 110, background: `linear-gradient(135deg, ${n.color || CO.forest} 0%, ${CO.river} 100%)`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ position: 'absolute', top: 9, left: 9, background: CO.gold, color: CO.deep, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '2px 8px', borderRadius: 3 }}>{n.badge}</span>
-              <svg width="45" height="45" viewBox="0 0 80 80" fill="none" opacity=".2"><path d="M15 60 Q30 30 50 45 Q65 55 70 35" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round" /><circle cx="50" cy="45" r="5" fill={CO.gold} /></svg>
-            </div>
+            {n.photo
+              ? <img src={n.photo} alt={n.title} style={{ width: '100%', height: 160, objectFit: 'cover' }} />
+              : <div style={{ height: 110, background: `linear-gradient(135deg,${n.color || CO.forest} 0%,${CO.river} 100%)`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ position: 'absolute', top: 9, left: 9, background: CO.gold, color: CO.deep, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '2px 8px', borderRadius: 3 }}>{n.badge}</span>
+                  <svg width="45" height="45" viewBox="0 0 80 80" fill="none" opacity=".2"><path d="M15 60 Q30 30 50 45 Q65 55 70 35" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round" /><circle cx="50" cy="45" r="5" fill={CO.gold} /></svg>
+                </div>
+            }
             <div style={{ padding: '1rem' }}>
+              {n.photo && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}><span style={{ background: CO.gold, color: CO.deep, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '2px 8px', borderRadius: 3 }}>{n.badge}</span></div>}
               <p style={{ fontSize: 12, color: CO.muted, marginBottom: 3 }}>{formatDate(n.date)}</p>
-              <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: CO.forest, marginBottom: 5, lineHeight: 1.3, fontSize: '.95rem' }}>{n.title}</p>
+              <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, color: CO.forest, marginBottom: 5, lineHeight: 1.3, fontSize: '.95rem' }}>{n.title}</p>
               <p style={{ fontSize: 13, color: CO.muted, lineHeight: 1.6, marginBottom: 10 }}>{n.text}</p>
               <div style={{ display: 'flex', gap: 5 }}>
                 <TFBtn small onClick={() => openEdit(n)}>✏ Rediger</TFBtn>
@@ -491,15 +420,15 @@ function NewsPage({ news, setNews, showToast }) {
       </div>
       {open && (
         <Modal title={editId ? 'Rediger nyhet' : 'Ny nyhet'} onClose={() => setOpen(false)}>
+          <FormRow label="Bilde">
+            <PhotoUpload photo={form.photo} onPhoto={(v) => f('photo', v)} onClear={() => f('photo', '')} label="Last opp nyhetsbilde" />
+            {form.photo && <button onClick={() => f('photo', '')} style={{ fontSize: 12, color: '#c0392b', marginTop: 6, textDecoration: 'underline', cursor: 'pointer', display: 'block' }}>Fjern bilde</button>}
+          </FormRow>
           <FormRow label="Dato"><TFInput value={form.date} onChange={(v) => f('date', v)} type="date" /></FormRow>
           <FormRow label="Badge"><TFSelect value={form.badge} onChange={(v) => f('badge', v)} options={NEWS_BADGES} /></FormRow>
           <FormRow label="Tittel"><TFInput value={form.title} onChange={(v) => f('title', v)} placeholder="Overskrift…" /></FormRow>
           <FormRow label="Ingress"><TFInput value={form.text} onChange={(v) => f('text', v)} placeholder="Kort beskrivelse…" multiline /></FormRow>
-          <FormRow label="Kortfarge">
-            <div style={{ display: 'flex', gap: 8 }}>
-              {NEWS_COLORS.map((col) => <div key={col} onClick={() => f('color', col)} style={{ width: 30, height: 30, borderRadius: 6, background: col, cursor: 'pointer', border: form.color === col ? `3px solid ${CO.gold}` : '2px solid transparent' }} />)}
-            </div>
-          </FormRow>
+          {!form.photo && <FormRow label="Kortfarge"><div style={{ display: 'flex', gap: 8 }}>{NEWS_COLORS.map((col) => <div key={col} onClick={() => f('color', col)} style={{ width: 30, height: 30, borderRadius: 6, background: col, cursor: 'pointer', border: form.color === col ? `3px solid ${CO.gold}` : '2px solid transparent' }} />)}</div></FormRow>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: '.5rem' }}>
             <TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn>
             <TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Publiser'}</TFBtn>
@@ -534,7 +463,7 @@ function EventsPage({ events, setEvents, showToast }) {
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
-        <div><p className="tf-label">Kalender</p><h2 className="tf-title">Arrangementer</h2></div>
+        <div><p className="tf-label">Kalender</p><h2 className="tf-title">Arrangement 2025</h2></div>
         <TFBtn variant="primary" onClick={openNew}>+ Nytt arrangement</TFBtn>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.7rem' }}>
@@ -543,19 +472,16 @@ function EventsPage({ events, setEvents, showToast }) {
           return (
             <div key={ev.id} className="tf-card" style={{ padding: '1rem', display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: '.9rem', alignItems: 'center' }}>
               <div style={{ background: CO.forest, color: CO.cream, borderRadius: 7, textAlign: 'center', padding: '5px 4px', lineHeight: 1 }}>
-                <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.3rem', fontWeight: 700, color: CO.gold, display: 'block' }}>{ev.day}</span>
+                <span style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.3rem', fontWeight: 700, color: CO.gold, display: 'block' }}>{ev.day}</span>
                 <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.08em', opacity: .8 }}>{ev.month}</span>
               </div>
               <div>
-                <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: CO.forest, marginBottom: 2, fontSize: '.92rem' }}>{ev.title}</p>
+                <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, color: CO.forest, marginBottom: 2, fontSize: '.92rem' }}>{ev.title}</p>
                 <p style={{ fontSize: 12, color: CO.muted }}>📍 {ev.location} · {ev.time}{ev.note ? ` · ${ev.note}` : ''}</p>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' }}>
                 <span className="tf-badge tf-ev-tag" style={{ background: bg, color: col, border: 'none' }}>{ev.tag}</span>
-                <div style={{ display: 'flex', gap: 5 }}>
-                  <TFBtn small onClick={() => openEdit(ev)}>✏</TFBtn>
-                  <TFBtn small variant="danger" onClick={() => setConfirmId(ev.id)}>🗑</TFBtn>
-                </div>
+                <div style={{ display: 'flex', gap: 5 }}><TFBtn small onClick={() => openEdit(ev)}>✏</TFBtn><TFBtn small variant="danger" onClick={() => setConfirmId(ev.id)}>🗑</TFBtn></div>
               </div>
             </div>
           )
@@ -564,26 +490,17 @@ function EventsPage({ events, setEvents, showToast }) {
       {open && (
         <Modal title={editId ? 'Rediger arrangement' : 'Nytt arrangement'} onClose={() => setOpen(false)}>
           <FormRow label="Dato"><TFInput value={form.date} onChange={(v) => {
-            f('date', v)
             if (v) {
               const d = new Date(v)
-              setForm((p) => ({
-                ...p,
-                date: v,
-                day: String(d.getDate()).padStart(2, '0'),
-                month: d.toLocaleString('nb-NO', { month: 'short' }).replace('.', '').replace(/^\w/, c => c.toUpperCase()),
-              }))
-            }
+              setForm((p) => ({ ...p, date: v, day: String(d.getDate()).padStart(2, '0'), month: d.toLocaleString('nb-NO', { month: 'short' }).replace('.', '').replace(/^\w/, c => c.toUpperCase()) }))
+            } else { setForm((p) => ({ ...p, date: '' })) }
           }} type="date" /></FormRow>
           <FormRow label="Tittel"><TFInput value={form.title} onChange={(v) => f('title', v)} placeholder="Arrangementsnavn" /></FormRow>
           <FormRow label="Sted"><TFInput value={form.location} onChange={(v) => f('location', v)} placeholder="Klubbhuset, Lillehammer" /></FormRow>
           <FormRow label="Tid"><TFInput value={form.time} onChange={(v) => f('time', v)} placeholder="10:00–14:00" /></FormRow>
           <FormRow label="Merknad"><TFInput value={form.note} onChange={(v) => f('note', v)} placeholder="Valgfritt…" /></FormRow>
           <FormRow label="Type"><TFSelect value={form.tag} onChange={(v) => f('tag', v)} options={EVENT_TAGS} /></FormRow>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn>
-            <TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Legg til'}</TFBtn>
-          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn><TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Legg til'}</TFBtn></div>
         </Modal>
       )}
       {confirmId && <ConfirmDialog message="Vil du slette dette arrangementet?" onConfirm={() => remove(confirmId)} onCancel={() => setConfirmId(null)} />}
@@ -592,8 +509,8 @@ function EventsPage({ events, setEvents, showToast }) {
 }
 
 // ─── Catches / Toppliste ──────────────────────────────────────────────────────
-const SPECIES_LIST = ['Ørret', 'Harr', 'Laks', 'Abbor', 'Gjedde', 'Røye', 'Sik', 'Mort']
-const METHOD_LIST = ['Flue', 'Sluk', 'Mark', 'Wobbler', 'Isfiske', 'Annet']
+const SPECIES_LIST = ['Ørret', 'Regnbueørret', 'Brunørret', 'Sjøørret', 'Harr', 'Laks', 'Sjølaks', 'Abbor', 'Gjedde', 'Røye', 'Sik', 'Mort', 'Brasme', 'Karpe', 'Ål', 'Lake', 'Laue', 'Flire', 'Vederbuk', 'Annet']
+const METHOD_LIST = ['Flue', 'Sluk', 'Mark', 'Wobbler', 'Isfiske', 'Pilk', 'Stikk', 'Fluefiske tørr', 'Fluefiske våt', 'Annet']
 const MEDALS = ['🥇', '🥈', '🥉']
 
 function CatchesPage({ catches, setCatches, members, waters, showToast }) {
@@ -626,20 +543,16 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
       </div>
       <div style={{ display: 'flex', gap: '.6rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', flex: 1 }}>
-          {allSpecies.map((s) => (
-            <button key={s} onClick={() => setFilterSpecies(s)} style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${filterSpecies === s ? CO.gold : '#ccc'}`, background: filterSpecies === s ? 'rgba(200,146,42,.15)' : 'transparent', color: filterSpecies === s ? CO.gold : CO.muted, fontWeight: filterSpecies === s ? 600 : 400, fontSize: 12, cursor: 'pointer' }}>
-              {s}
-            </button>
-          ))}
+          {allSpecies.map((s) => <button key={s} onClick={() => setFilterSpecies(s)} style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${filterSpecies === s ? CO.gold : '#ccc'}`, background: filterSpecies === s ? 'rgba(200,146,42,.15)' : 'transparent', color: filterSpecies === s ? CO.gold : CO.muted, fontWeight: filterSpecies === s ? 600 : 400, fontSize: 12, cursor: 'pointer' }}>{s}</button>)}
         </div>
         <TFSelect value={sortBy} onChange={setSortBy} options={[{ value: 'weight', label: 'Tyngst fisk' }, { value: 'length', label: 'Lengste fisk' }]} />
       </div>
       {sorted.length > 0 && (
-        <div className="tf-podium" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="tf-podium" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
           {sorted.slice(0, 3).map((c, i) => (
             <div key={c.id} style={{ background: i === 0 ? CO.forest : CO.white, border: `2px solid ${i === 0 ? CO.gold : CO.creamDk}`, borderRadius: 10, padding: '1rem', textAlign: 'center' }}>
               <div style={{ fontSize: '1.6rem', marginBottom: 3 }}>{MEDALS[i]}</div>
-              <p style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: '1rem', color: i === 0 ? CO.gold : CO.forest, marginBottom: 2 }}>{c.angler}</p>
+              <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, fontSize: '1rem', color: i === 0 ? CO.gold : CO.forest, marginBottom: 2 }}>{c.angler}</p>
               <p style={{ fontSize: '1.25rem', fontWeight: 700, color: i === 0 ? CO.cream : CO.text }}>{c.weight} kg</p>
               <p style={{ fontSize: 12, color: i === 0 ? CO.mist : CO.muted }}>{c.length} cm · {c.species}</p>
               <p style={{ fontSize: 11, color: i === 0 ? CO.mist : CO.muted, opacity: .7, marginTop: 2 }}>{c.water}</p>
@@ -649,13 +562,7 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
       )}
       <div className="tf-card" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 500 }}>
-          <thead>
-            <tr style={{ background: CO.forest }}>
-              {['#', 'Fisker', 'Art', 'Vekt', 'Lengde', 'Vann', 'Metode', 'Dato', ''].map((h) => (
-                <th key={h} style={{ padding: '9px 11px', textAlign: 'left', color: CO.mist, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
+          <thead><tr style={{ background: CO.forest }}>{['#', 'Fisker', 'Art', 'Vekt', 'Lengde', 'Vann', 'Metode', 'Dato', ''].map((h) => <th key={h} style={{ padding: '9px 11px', textAlign: 'left', color: CO.mist, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>{h}</th>)}</tr></thead>
           <tbody>
             {sorted.map((c, i) => (
               <tr key={c.id} style={{ borderBottom: `1px solid ${CO.creamDk}`, background: i % 2 === 0 ? CO.white : '#faf7f2' }}>
@@ -667,12 +574,7 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
                 <td style={{ padding: '9px 11px', color: CO.muted, whiteSpace: 'nowrap' }}>{c.water}</td>
                 <td style={{ padding: '9px 11px', color: CO.muted }}>{c.method}</td>
                 <td style={{ padding: '9px 11px', color: CO.muted, whiteSpace: 'nowrap' }}>{formatDate(c.date)}</td>
-                <td style={{ padding: '9px 11px' }}>
-                  <div style={{ display: 'flex', gap: 5 }}>
-                    <TFBtn small onClick={() => openEdit(c)}>✏</TFBtn>
-                    <TFBtn small variant="danger" onClick={() => setConfirmId(c.id)}>🗑</TFBtn>
-                  </div>
-                </td>
+                <td style={{ padding: '9px 11px' }}><div style={{ display: 'flex', gap: 5 }}><TFBtn small onClick={() => openEdit(c)}>✏</TFBtn><TFBtn small variant="danger" onClick={() => setConfirmId(c.id)}>🗑</TFBtn></div></td>
               </tr>
             ))}
           </tbody>
@@ -691,10 +593,7 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
           <FormRow label="Metode"><TFSelect value={form.method} onChange={(v) => f('method', v)} options={METHOD_LIST} /></FormRow>
           <FormRow label="Dato"><TFInput value={form.date} onChange={(v) => f('date', v)} type="date" /></FormRow>
           <FormRow label="Merknad"><TFInput value={form.note} onChange={(v) => f('note', v)} placeholder="Valgfritt…" /></FormRow>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn>
-            <TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Registrer'}</TFBtn>
-          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn><TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Registrer'}</TFBtn></div>
         </Modal>
       )}
       {confirmId && <ConfirmDialog message="Vil du slette denne fangsten?" onConfirm={() => remove(confirmId)} onCancel={() => setConfirmId(null)} />}
@@ -702,29 +601,80 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
   )
 }
 
+// ─── Merch ────────────────────────────────────────────────────────────────────
+function MerchPage({ merch, setMerch, showToast }) {
+  const empty = { name: '', desc: '', price: '', photo: '' }
+  const [open, setOpen] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [form, setForm] = useState(empty)
+  const [confirmId, setConfirmId] = useState(null)
+  const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+  const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
+  const openEdit = (item) => { setEditId(item.id); setForm({ ...item }); setOpen(true) }
+  const save = () => {
+    if (!form.name.trim()) return
+    const updated = editId ? merch.map((m) => m.id === editId ? { ...form, id: editId } : m) : [...merch, { ...form, id: nextId(merch) }]
+    setMerch(updated); setOpen(false); showToast(editId ? 'Produkt oppdatert' : 'Produkt lagt til')
+  }
+  const remove = (id) => { setMerch(merch.filter((m) => m.id !== id)); setConfirmId(null); showToast('Produkt slettet') }
+  return (
+    <div className="tf-wrap">
+      <div className="tf-ph">
+        <div><p className="tf-label">Klubbens butikk</p><h2 className="tf-title">T&F Merch</h2></div>
+        <TFBtn variant="primary" onClick={openNew}>+ Nytt produkt</TFBtn>
+      </div>
+      {merch.length === 0 && <div style={{ textAlign: 'center', padding: '4rem 2rem', color: CO.muted }}>
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🧢</div>
+        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.2rem', color: CO.forest, marginBottom: '.5rem' }}>Ingen produkter ennå</div>
+        <p style={{ fontSize: 14 }}>Klikk «+ Nytt produkt» for å legge til caps, jakker, fluebokser og annet.</p>
+      </div>}
+      <div className="tf-grid">
+        {merch.map((item) => (
+          <div key={item.id} className="tf-card">
+            {item.photo
+              ? <img src={item.photo} alt={item.name} style={{ width: '100%', height: 200, objectFit: 'cover' }} />
+              : <div style={{ height: 160, background: `linear-gradient(135deg,${CO.forest},${CO.river})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🧢</div>
+            }
+            <div style={{ padding: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, color: CO.forest, fontSize: '1rem', lineHeight: 1.2 }}>{item.name}</p>
+                {item.price && <span style={{ background: CO.gold, color: CO.deep, fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 5, whiteSpace: 'nowrap', marginLeft: 8 }}>{item.price}</span>}
+              </div>
+              {item.desc && <p style={{ fontSize: 13, color: CO.muted, lineHeight: 1.6, marginBottom: 10 }}>{item.desc}</p>}
+              <div style={{ display: 'flex', gap: 5, marginTop: 8 }}>
+                <TFBtn small onClick={() => openEdit(item)}>✏ Rediger</TFBtn>
+                <TFBtn small variant="danger" onClick={() => setConfirmId(item.id)}>🗑 Slett</TFBtn>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {open && (
+        <Modal title={editId ? 'Rediger produkt' : 'Nytt produkt'} onClose={() => setOpen(false)}>
+          <FormRow label="Produktbilde">
+            <PhotoUpload photo={form.photo} onPhoto={(v) => f('photo', v)} onClear={() => f('photo', '')} label="Last opp produktbilde" />
+            {form.photo && <button onClick={() => f('photo', '')} style={{ fontSize: 12, color: '#c0392b', marginTop: 6, textDecoration: 'underline', cursor: 'pointer', display: 'block' }}>Fjern bilde</button>}
+          </FormRow>
+          <FormRow label="Produktnavn"><TFInput value={form.name} onChange={(v) => f('name', v)} placeholder="T&F Caps" /></FormRow>
+          <FormRow label="Beskrivelse"><TFInput value={form.desc} onChange={(v) => f('desc', v)} placeholder="Kvalitetscaps med klubblogo, en størrelse…" multiline /></FormRow>
+          <FormRow label="Pris (valgfri)"><TFInput value={form.price} onChange={(v) => f('price', v)} placeholder="kr 249" /></FormRow>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn><TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Legg til'}</TFBtn></div>
+        </Modal>
+      )}
+      {confirmId && <ConfirmDialog message="Vil du slette dette produktet?" onConfirm={() => remove(confirmId)} onCancel={() => setConfirmId(null)} />}
+    </div>
+  )
+}
+
 // ─── Members ──────────────────────────────────────────────────────────────────
 const MEMBER_BADGES = ['', 'Styre', 'Æresmedlem', 'Rekordinnehaver', 'Junior']
-
 function MembersPage({ members, setMembers, showToast }) {
   const empty = { name: '', role: '', badge: '', photo: '' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(empty)
   const [confirmId, setConfirmId] = useState(null)
-  const [uploading, setUploading] = useState(false)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
-
-  const handlePhoto = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      const b64 = await fileToBase64(file)
-      f('photo', b64)
-    } catch (err) { console.error(err) }
-    setUploading(false)
-  }
-
   const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
   const openEdit = (m) => { setEditId(m.id); setForm({ ...m, photo: m.photo || '' }); setOpen(true) }
   const save = () => {
@@ -733,61 +683,30 @@ function MembersPage({ members, setMembers, showToast }) {
     setMembers(updated); setOpen(false); showToast(editId ? 'Medlem oppdatert' : 'Nytt medlem lagt til')
   }
   const remove = (id) => { setMembers(members.filter((m) => m.id !== id)); setConfirmId(null); showToast('Medlem fjernet') }
-
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
-        <div>
-          <p className="tf-label">Klubbens folk</p>
-          <h2 className="tf-title">Medlemmer & styre</h2>
-          <p style={{ fontSize: 13, color: CO.muted, marginTop: 3 }}>{members.length} registrerte medlemmer</p>
-        </div>
+        <div><p className="tf-label">Klubbens folk</p><h2 className="tf-title">Medlemmer & styre</h2><p style={{ fontSize: 13, color: CO.muted, marginTop: 3 }}>{members.length} registrerte medlemmer</p></div>
         <TFBtn variant="primary" onClick={openNew}>+ Nytt medlem</TFBtn>
       </div>
       <div className="tf-grid-sm">
         {members.map((m) => (
           <div key={m.id} className="tf-card" style={{ padding: '1.25rem 1rem', textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '.65rem' }}>
-              <MemberAvatar name={m.name} photo={m.photo} size={56} />
-            </div>
-            <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '.88rem', fontWeight: 700, color: CO.forest, marginBottom: 2 }}>{m.name}</p>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '.65rem' }}><MemberAvatar name={m.name} photo={m.photo} size={56} /></div>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '.88rem', fontWeight: 700, color: CO.forest, marginBottom: 2 }}>{m.name}</p>
             <p style={{ fontSize: 11, color: CO.muted, marginBottom: m.badge ? 5 : 10 }}>{m.role}</p>
             {m.badge && <span className="tf-badge tf-badge-gold" style={{ marginBottom: 8, display: 'inline-flex' }}>{m.badge}</span>}
-            <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 4 }}>
-              <TFBtn small onClick={() => openEdit(m)}>✏</TFBtn>
-              <TFBtn small variant="danger" onClick={() => setConfirmId(m.id)}>🗑</TFBtn>
-            </div>
+            <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 4 }}><TFBtn small onClick={() => openEdit(m)}>✏</TFBtn><TFBtn small variant="danger" onClick={() => setConfirmId(m.id)}>🗑</TFBtn></div>
           </div>
         ))}
       </div>
       {open && (
         <Modal title={editId ? 'Rediger medlem' : 'Nytt medlem'} onClose={() => setOpen(false)}>
-          <FormRow label="Profilbilde">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div className="photo-upload">
-                {form.photo
-                  ? <img src={form.photo} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 22 }}>📷</div>
-                      <div style={{ fontSize: 10, color: CO.muted, marginTop: 2 }}>Last opp</div>
-                    </div>
-                }
-                <input type="file" accept="image/*" onChange={handlePhoto} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 12, color: CO.muted, lineHeight: 1.5 }}>Klikk sirkelen for å laste opp bilde. Vises på medlemskortet.</p>
-                {uploading && <p style={{ fontSize: 12, color: CO.gold, marginTop: 4 }}>Laster opp…</p>}
-                {form.photo && <button onClick={() => f('photo', '')} style={{ fontSize: 12, color: '#c0392b', marginTop: 6, textDecoration: 'underline', cursor: 'pointer' }}>Fjern bilde</button>}
-              </div>
-            </div>
-          </FormRow>
+          <FormRow label="Profilbilde"><PhotoUpload photo={form.photo} onPhoto={(v) => f('photo', v)} onClear={() => f('photo', '')} circle label="Last opp" /></FormRow>
           <FormRow label="Fullt navn"><TFInput value={form.name} onChange={(v) => f('name', v)} placeholder="Ola Nordmann" /></FormRow>
           <FormRow label="Rolle / tittel"><TFInput value={form.role} onChange={(v) => f('role', v)} placeholder="Medlem siden 2025" /></FormRow>
           <FormRow label="Badge (valgfri)"><TFSelect value={form.badge} onChange={(v) => f('badge', v)} options={MEMBER_BADGES.map((b) => ({ value: b, label: b || '— ingen badge —' }))} /></FormRow>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn>
-            <TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Legg til'}</TFBtn>
-          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn><TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Legg til'}</TFBtn></div>
         </Modal>
       )}
       {confirmId && <ConfirmDialog message={`Vil du fjerne ${members.find((m) => m.id === confirmId)?.name}?`} onConfirm={() => remove(confirmId)} onCancel={() => setConfirmId(null)} />}
@@ -798,11 +717,7 @@ function MembersPage({ members, setMembers, showToast }) {
 // ─── Waters ───────────────────────────────────────────────────────────────────
 function WatersPage({ waters, setWaters, showToast }) {
   const empty = { name: '', location: '', desc: '', tags: [] }
-  const [open, setOpen] = useState(false)
-  const [editId, setEditId] = useState(null)
-  const [form, setForm] = useState(empty)
-  const [tagInput, setTagInput] = useState('')
-  const [confirmId, setConfirmId] = useState(null)
+  const [open, setOpen] = useState(false); const [editId, setEditId] = useState(null); const [form, setForm] = useState(empty); const [tagInput, setTagInput] = useState(''); const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
   const addTag = () => { const t = tagInput.trim(); if (t && !form.tags.includes(t)) setForm((p) => ({ ...p, tags: [...p.tags, t] })); setTagInput('') }
   const openNew = () => { setEditId(null); setForm(empty); setTagInput(''); setOpen(true) }
@@ -815,19 +730,14 @@ function WatersPage({ waters, setWaters, showToast }) {
   const remove = (id) => { setWaters(waters.filter((w) => w.id !== id)); setConfirmId(null); showToast('Fiskevann fjernet') }
   return (
     <div className="tf-wrap">
-      <div className="tf-ph">
-        <div><p className="tf-label">Fiskerettigheter</p><h2 className="tf-title">Klubbens fiskevann</h2></div>
-        <TFBtn variant="primary" onClick={openNew}>+ Nytt vann</TFBtn>
-      </div>
+      <div className="tf-ph"><div><p className="tf-label">Fiskerettigheter</p><h2 className="tf-title">Klubbens fiskevann</h2></div><TFBtn variant="primary" onClick={openNew}>+ Nytt vann</TFBtn></div>
       <div className="tf-grid">
         {waters.map((w) => (
           <div key={w.id} style={{ background: CO.forest, borderRadius: 10, padding: '1.4rem' }}>
-            <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', fontWeight: 700, color: CO.gold, marginBottom: 3 }}>{w.name}</p>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.1rem', fontWeight: 700, color: CO.gold, marginBottom: 3 }}>{w.name}</p>
             <p style={{ fontSize: 12, color: CO.mist, marginBottom: 8, opacity: .8 }}>📍 {w.location}</p>
             <p style={{ fontSize: 13, color: CO.cream, lineHeight: 1.6, marginBottom: 10, opacity: .85 }}>{w.desc}</p>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
-              {w.tags.map((t) => <span key={t} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, border: `1px solid rgba(200,146,42,.35)`, color: CO.goldLt }}>{t}</span>)}
-            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>{w.tags.map((t) => <span key={t} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, border: `1px solid rgba(200,146,42,.35)`, color: CO.goldLt }}>{t}</span>)}</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <TFBtn small onClick={() => openEdit(w)} style={{ color: CO.cream, borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>✏ Rediger</TFBtn>
               <TFBtn small variant="danger" onClick={() => setConfirmId(w.id)} style={{ background: 'rgba(220,60,60,.15)', borderColor: 'rgba(220,60,60,.3)', color: '#ff9a9a' }}>🗑</TFBtn>
@@ -840,19 +750,8 @@ function WatersPage({ waters, setWaters, showToast }) {
           <FormRow label="Navn"><TFInput value={form.name} onChange={(v) => f('name', v)} placeholder="Steinelva" /></FormRow>
           <FormRow label="Sted / størrelse"><TFInput value={form.location} onChange={(v) => f('location', v)} placeholder="Gausdal · 4,2 km" /></FormRow>
           <FormRow label="Beskrivelse"><TFInput value={form.desc} onChange={(v) => f('desc', v)} placeholder="Beskrivelse…" multiline /></FormRow>
-          <FormRow label="Tags">
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-              {form.tags.map((t) => <TagPill key={t} label={t} onRemove={() => f('tags', form.tags.filter((x) => x !== t))} />)}
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <TFInput value={tagInput} onChange={setTagInput} placeholder="Ørret, Flue…" style={{ flex: 1 }} />
-              <TFBtn variant="forest" onClick={addTag}>+</TFBtn>
-            </div>
-          </FormRow>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn>
-            <TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Legg til'}</TFBtn>
-          </div>
+          <FormRow label="Tags"><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>{form.tags.map((t) => <TagPill key={t} label={t} onRemove={() => f('tags', form.tags.filter((x) => x !== t))} />)}</div><div style={{ display: 'flex', gap: 6 }}><TFInput value={tagInput} onChange={setTagInput} placeholder="Ørret, Flue…" style={{ flex: 1 }} /><TFBtn variant="forest" onClick={addTag}>+</TFBtn></div></FormRow>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn><TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Legg til'}</TFBtn></div>
         </Modal>
       )}
       {confirmId && <ConfirmDialog message="Vil du fjerne dette fiskevannet?" onConfirm={() => remove(confirmId)} onCancel={() => setConfirmId(null)} />}
@@ -862,61 +761,224 @@ function WatersPage({ waters, setWaters, showToast }) {
 
 // ─── Rules ────────────────────────────────────────────────────────────────────
 function RulesPage({ rules, setRules, showToast }) {
-  const [editingId, setEditingId] = useState(null)
-  const [editTitle, setEditTitle] = useState('')
-  const [editItems, setEditItems] = useState([])
-  const [newItemText, setNewItemText] = useState('')
-  const [confirmId, setConfirmId] = useState(null)
+  const [editingId, setEditingId] = useState(null); const [editTitle, setEditTitle] = useState(''); const [editItems, setEditItems] = useState([]); const [newItemText, setNewItemText] = useState(''); const [confirmId, setConfirmId] = useState(null)
   const startEdit = (r) => { setEditingId(r.id); setEditTitle(r.title); setEditItems([...r.items]); setNewItemText('') }
-  const saveEdit = () => {
-    setRules(rules.map((r) => r.id === editingId ? { ...r, title: editTitle, items: editItems } : r))
-    setEditingId(null); showToast('Regler oppdatert')
-  }
+  const saveEdit = () => { setRules(rules.map((r) => r.id === editingId ? { ...r, title: editTitle, items: editItems } : r)); setEditingId(null); showToast('Regler oppdatert') }
   const removeBlock = (id) => { setRules(rules.filter((r) => r.id !== id)); setConfirmId(null); showToast('Regelblokk slettet') }
   const addBlock = () => { setRules([...rules, { id: nextId(rules), icon: '📋', title: 'Ny regelblokk', items: ['Regel 1'] }]); showToast('Regelblokk lagt til') }
   return (
     <div className="tf-wrap">
-      <div className="tf-ph">
-        <div><p className="tf-label">Vedtekter & etikk</p><h2 className="tf-title">Regler og retningslinjer</h2></div>
-        <TFBtn variant="primary" onClick={addBlock}>+ Ny regelblokk</TFBtn>
-      </div>
+      <div className="tf-ph"><div><p className="tf-label">Vedtekter & etikk</p><h2 className="tf-title">Regler og retningslinjer</h2></div><TFBtn variant="primary" onClick={addBlock}>+ Ny regelblokk</TFBtn></div>
       <div className="tf-grid">
         {rules.map((r) => (
           <div key={r.id} className="tf-card" style={{ padding: '1.4rem', borderLeft: `4px solid ${CO.gold}`, borderRadius: '0 10px 10px 0' }}>
             {editingId === r.id ? (
               <>
                 <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="tf-input" style={{ fontWeight: 700, marginBottom: 10 }} />
-                {editItems.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 5, marginBottom: 5 }}>
-                    <input value={item} onChange={(e) => setEditItems((it) => it.map((x, j) => j === i ? e.target.value : x))} className="tf-input" style={{ flex: 1, fontSize: 13 }} />
-                    <button onClick={() => setEditItems((it) => it.filter((_, j) => j !== i))} style={{ color: '#c0392b', fontSize: 18, padding: '0 4px', lineHeight: 1 }}>×</button>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', gap: 6, margin: '8px 0 12px' }}>
-                  <TFInput value={newItemText} onChange={setNewItemText} placeholder="Ny regel…" style={{ flex: 1 }} />
-                  <TFBtn variant="forest" onClick={() => { if (newItemText.trim()) { setEditItems((i) => [...i, newItemText.trim()]); setNewItemText('') } }}>+</TFBtn>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <TFBtn small variant="primary" onClick={saveEdit}>Lagre</TFBtn>
-                  <TFBtn small onClick={() => setEditingId(null)}>Avbryt</TFBtn>
-                </div>
+                {editItems.map((item, i) => <div key={i} style={{ display: 'flex', gap: 5, marginBottom: 5 }}><input value={item} onChange={(e) => setEditItems((it) => it.map((x, j) => j === i ? e.target.value : x))} className="tf-input" style={{ flex: 1, fontSize: 13 }} /><button onClick={() => setEditItems((it) => it.filter((_, j) => j !== i))} style={{ color: '#c0392b', fontSize: 18, padding: '0 4px', lineHeight: 1 }}>×</button></div>)}
+                <div style={{ display: 'flex', gap: 6, margin: '8px 0 12px' }}><TFInput value={newItemText} onChange={setNewItemText} placeholder="Ny regel…" style={{ flex: 1 }} /><TFBtn variant="forest" onClick={() => { if (newItemText.trim()) { setEditItems((i) => [...i, newItemText.trim()]); setNewItemText('') } }}>+</TFBtn></div>
+                <div style={{ display: 'flex', gap: 6 }}><TFBtn small variant="primary" onClick={saveEdit}>Lagre</TFBtn><TFBtn small onClick={() => setEditingId(null)}>Avbryt</TFBtn></div>
               </>
             ) : (
               <>
-                <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1rem', fontWeight: 700, color: CO.forest, marginBottom: 10 }}>{r.icon} {r.title}</h3>
-                <ul style={{ paddingLeft: '1.1rem' }}>
-                  {r.items.map((item, i) => <li key={i} style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 2 }}>{item}</li>)}
-                </ul>
-                <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-                  <TFBtn small onClick={() => startEdit(r)}>✏ Rediger</TFBtn>
-                  <TFBtn small variant="danger" onClick={() => setConfirmId(r.id)}>🗑</TFBtn>
-                </div>
+                <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1rem', fontWeight: 700, color: CO.forest, marginBottom: 10 }}>{r.icon} {r.title}</h3>
+                <ul style={{ paddingLeft: '1.1rem' }}>{r.items.map((item, i) => <li key={i} style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 2 }}>{item}</li>)}</ul>
+                <div style={{ display: 'flex', gap: 6, marginTop: 12 }}><TFBtn small onClick={() => startEdit(r)}>✏ Rediger</TFBtn><TFBtn small variant="danger" onClick={() => setConfirmId(r.id)}>🗑</TFBtn></div>
               </>
             )}
           </div>
         ))}
       </div>
       {confirmId && <ConfirmDialog message="Vil du slette denne regelblokken?" onConfirm={() => removeBlock(confirmId)} onCancel={() => setConfirmId(null)} />}
+    </div>
+  )
+}
+
+// ─── FISHING GAME ─────────────────────────────────────────────────────────────
+const FISH_TYPES = [
+  { emoji: '🐟', name: 'Ørret', points: 10, speed: 1.2, size: 28 },
+  { emoji: '🦈', name: 'Stor laks', points: 50, speed: 2.2, size: 32 },
+  { emoji: '🐠', name: 'Regnbueørret', points: 20, speed: 1.6, size: 26 },
+  { emoji: '🐡', name: 'Abbor', points: 5, speed: 0.9, size: 24 },
+  { emoji: '🦑', name: 'Mystisk fisk', points: 100, speed: 3, size: 22 },
+  { emoji: '🐟', name: 'Harr', points: 15, speed: 1.4, size: 26 },
+  { emoji: '🐙', name: 'Gjedde', points: 30, speed: 1.8, size: 30 },
+]
+
+function FishingGame() {
+  const [gameState, setGameState] = useState('idle') // idle | playing | gameover
+  const [score, setScore] = useState(0)
+  const [highScore, setHighScore] = useState(() => parseInt(localStorage.getItem('tf_highscore') || '0'))
+  const [fish, setFish] = useState([])
+  const [splashes, setSplashes] = useState([])
+  const [bobberY, setBobberY] = useState(55)
+  const [bobberX, setBobberX] = useState(50)
+  const [timeLeft, setTimeLeft] = useState(30)
+  const [combo, setCombo] = useState(0)
+  const [lastCatch, setLastCatch] = useState(null)
+  const gameRef = useRef(null)
+  const animRef = useRef(null)
+  const fishRef = useRef([])
+  const tickRef = useRef(null)
+  const spawnRef = useRef(null)
+  const idRef = useRef(0)
+
+  const spawnFish = useCallback(() => {
+    const type = FISH_TYPES[Math.floor(Math.random() * FISH_TYPES.length)]
+    const fromLeft = Math.random() > 0.5
+    const newFish = {
+      id: idRef.current++,
+      type,
+      x: fromLeft ? -5 : 105,
+      y: 20 + Math.random() * 55,
+      dir: fromLeft ? 1 : -1,
+      speed: type.speed * (0.8 + Math.random() * 0.4),
+    }
+    setFish((prev) => [...prev, newFish])
+  }, [])
+
+  const startGame = () => {
+    setGameState('playing'); setScore(0); setTimeLeft(30); setCombo(0); setLastCatch(null)
+    setFish([]); setSplashes([])
+    fishRef.current = []
+  }
+
+  useEffect(() => {
+    if (gameState !== 'playing') return
+    spawnRef.current = setInterval(spawnFish, 1200)
+    tickRef.current = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) { setGameState('gameover'); clearInterval(spawnRef.current); clearInterval(tickRef.current); return 0 }
+        return t - 1
+      })
+      setFish((prev) => prev.map((f) => ({ ...f, x: f.x + f.dir * f.speed })).filter((f) => f.x > -15 && f.x < 115))
+    }, 100)
+    return () => { clearInterval(spawnRef.current); clearInterval(tickRef.current) }
+  }, [gameState, spawnFish])
+
+  useEffect(() => {
+    if (gameState === 'gameover') {
+      setHighScore((prev) => { const hs = Math.max(prev, score); localStorage.setItem('tf_highscore', String(hs)); return hs })
+    }
+  }, [gameState, score])
+
+  const handleCast = (e) => {
+    if (gameState !== 'playing') return
+    const rect = gameRef.current.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const x = ((clientX - rect.left) / rect.width) * 100
+    const y = ((clientY - rect.top) / rect.height) * 100
+    setBobberX(x); setBobberY(y)
+    // Check if any fish is near the bobber
+    let caught = false
+    setFish((prev) => {
+      const remaining = prev.filter((f) => {
+        const dx = Math.abs(f.x - x); const dy = Math.abs(f.y - y)
+        if (dx < 8 && dy < 8) {
+          caught = true
+          const pts = f.type.points
+          setScore((s) => s + pts)
+          setCombo((c) => c + 1)
+          setLastCatch({ name: f.type.name, points: pts, x, y })
+          setSplashes((sp) => [...sp, { id: Date.now(), x, y }])
+          setTimeout(() => setSplashes((sp) => sp.filter((s) => s.id !== Date.now())), 700)
+          return false
+        }
+        return true
+      })
+      return remaining
+    })
+    if (!caught) setCombo(0)
+  }
+
+  const barColor = timeLeft > 15 ? CO.river : timeLeft > 7 ? CO.gold : '#e74c3c'
+
+  return (
+    <div className="tf-wrap">
+      <div className="tf-ph">
+        <div><p className="tf-label">Klubbens arkadeseksjon</p><h2 className="tf-title">🎮 Fiskespill</h2></div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <span style={{ fontSize: 13, color: CO.muted }}>🏆 Rekord: <b style={{ color: CO.gold }}>{highScore}</b></span>
+          {gameState !== 'idle' && <TFBtn variant="primary" onClick={startGame}>{gameState === 'playing' ? '↺ Start på nytt' : '▶ Spill igjen'}</TFBtn>}
+        </div>
+      </div>
+
+      {gameState === 'idle' && (
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎣</div>
+          <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.forest, marginBottom: '.75rem' }}>Klar til å fiske?</h3>
+          <p style={{ color: CO.muted, marginBottom: '1.5rem', fontSize: 14, maxWidth: 380, margin: '0 auto 1.5rem' }}>Klikk eller trykk på fisken for å fange dem. Du har 30 sekunder — få så høy score som mulig!</p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2rem' }}>
+            {FISH_TYPES.map((f) => <div key={f.name} style={{ background: CO.white, border: `1px solid ${CO.creamDk}`, borderRadius: 8, padding: '.5rem .85rem', fontSize: 13 }}>{f.emoji} {f.name} — <b style={{ color: CO.gold }}>{f.points}p</b></div>)}
+          </div>
+          <TFBtn variant="primary" onClick={startGame} style={{ fontSize: 16, padding: '12px 32px' }}>▶ Start spillet</TFBtn>
+        </div>
+      )}
+
+      {(gameState === 'playing' || gameState === 'gameover') && (
+        <>
+          {/* Scoreboard */}
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: CO.forest }}>⏱ {timeLeft}s</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: CO.forest }}>Score: <b style={{ color: CO.gold }}>{score}</b></span>
+                {combo > 1 && <span style={{ fontSize: 13, fontWeight: 700, color: '#e74c3c' }}>🔥 x{combo} combo!</span>}
+              </div>
+              <div style={{ height: 8, background: CO.creamDk, borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${(timeLeft / 30) * 100}%`, background: barColor, borderRadius: 4, transition: 'width .1s, background .5s' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Game canvas */}
+          <div ref={gameRef} className="game-canvas"
+            style={{ height: 340, touchAction: 'none' }}
+            onClick={handleCast}
+            onTouchStart={handleCast}>
+
+            {/* Water lines */}
+            {[30, 50, 70, 90].map((y) => <div key={y} className="water-line" style={{ top: `${y}%`, opacity: 0.15 + y * 0.002 }} />)}
+
+            {/* Fish */}
+            {fish.map((f) => (
+              <div key={f.id} className="fish" style={{ left: `${f.x}%`, top: `${f.y}%`, fontSize: f.type.size, transform: f.dir === -1 ? 'scaleX(-1)' : 'none' }}>
+                {f.type.emoji}
+              </div>
+            ))}
+
+            {/* Bobber */}
+            {gameState === 'playing' && <div className="bobber" style={{ left: `${bobberX}%`, top: `${bobberY}%`, transform: 'translate(-50%,-50%)' }} />}
+
+            {/* Splash effects */}
+            {splashes.map((s) => <div key={s.id} className="splash" style={{ left: `${s.x}%`, top: `${s.y}%`, transform: 'translate(-50%,-50%)' }}>💦</div>)}
+
+            {/* Last catch popup */}
+            {lastCatch && (
+              <div style={{ position: 'absolute', left: `${Math.min(Math.max(lastCatch.x, 15), 80)}%`, top: `${Math.max(lastCatch.y - 12, 5)}%`, background: CO.gold, color: CO.deep, padding: '3px 10px', borderRadius: 20, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', animation: 'splash .8s ease-out forwards', pointerEvents: 'none' }}>
+                +{lastCatch.points} {lastCatch.name}
+              </div>
+            )}
+
+            {/* Overlay text */}
+            {gameState === 'playing' && fish.length === 0 && (
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.4)', fontSize: 16 }}>Fisken er på vei…</div>
+            )}
+          </div>
+
+          {/* Game over */}
+          {gameState === 'gameover' && (
+            <div style={{ textAlign: 'center', padding: '2rem', background: CO.forest, borderRadius: '0 0 12px 12px', marginTop: 0 }}>
+              <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.gold, marginBottom: '.5rem' }}>Timen er ute!</p>
+              <p style={{ fontSize: '2rem', fontWeight: 700, color: CO.cream, marginBottom: '.25rem' }}>{score} poeng</p>
+              {score >= highScore && score > 0 && <p style={{ color: CO.gold, fontSize: 14, marginBottom: '1rem' }}>🏆 Ny personrekord!</p>}
+              {score < highScore && <p style={{ color: CO.mist, fontSize: 13, marginBottom: '1rem', opacity: .7 }}>Rekord: {highScore} poeng</p>}
+              <TFBtn variant="primary" onClick={startGame} style={{ fontSize: 15, padding: '10px 28px' }}>▶ Spill igjen</TFBtn>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -934,36 +996,23 @@ export default function App() {
   const [waters, setWaters] = useState(SEED.waters)
   const [rules, setRules] = useState(SEED.rules)
   const [catches, setCatches] = useState(SEED.catches)
+  const [merch, setMerch] = useState(SEED.merch)
 
-  // On mount: load from Firebase, seed if empty, then listen for real-time updates
   useEffect(() => {
-    const KEYS = ['news', 'events', 'members', 'waters', 'rules', 'catches']
-    const setters = { news: setNews, events: setEvents, members: setMembers, waters: setWaters, rules: setRules, catches: setCatches }
-
-    // Load once, then seed if nothing in Firebase yet
+    const KEYS = ['news', 'events', 'members', 'waters', 'rules', 'catches', 'merch']
+    const setters = { news: setNews, events: setEvents, members: setMembers, waters: setWaters, rules: setRules, catches: setCatches, merch: setMerch }
     Promise.all(KEYS.map((k) => fbGet(k))).then((results) => {
       KEYS.forEach((k, i) => {
-        if (results[i] && results[i].length > 0) {
-          setters[k](results[i])
-        } else {
-          // Nothing in Firebase yet — write seed data
-          fbSet(k, SEED[k])
-        }
+        if (results[i] && results[i].length > 0) setters[k](results[i])
+        else fbSet(k, SEED[k])
       })
     })
-
-    // Real-time listeners — always reflect latest Firebase data
     const unsubs = KEYS.map((k) => fbListen(k, (data) => setters[k](data)))
     return () => unsubs.forEach((u) => u())
   }, [])
 
-  // Persist to Firebase whenever state changes
   const makeSetter = (setter, key) => (val) => {
-    setter((prev) => {
-      const v = typeof val === 'function' ? val(prev) : val
-      fbSet(key, v)
-      return v
-    })
+    setter((prev) => { const v = typeof val === 'function' ? val(prev) : val; fbSet(key, v); return v })
   }
 
   const setNewsP = makeSetter(setNews, 'news')
@@ -972,12 +1021,9 @@ export default function App() {
   const setWatersP = makeSetter(setWaters, 'waters')
   const setRulesP = makeSetter(setRules, 'rules')
   const setCatchesP = makeSetter(setCatches, 'catches')
+  const setMerchP = makeSetter(setMerch, 'merch')
 
-  const showToast = (msg) => {
-    setToastMsg(msg)
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToastMsg(null), 2500)
-  }
+  const showToast = (msg) => { setToastMsg(msg); if (toastTimer.current) clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToastMsg(null), 2500) }
 
   if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />
 
@@ -985,22 +1031,19 @@ export default function App() {
     <div style={{ minHeight: '100dvh', background: CO.cream }}>
       <style>{GLOBAL_CSS}</style>
       <SiteNav currentPage={page} onNavigate={setPage} onLogout={() => setLoggedIn(false)} />
-
       {page === 'hjem' && <HomePage news={news} events={events} members={members} waters={waters} catches={catches} onNavigate={setPage} />}
       {page === 'nyheter' && <NewsPage news={news} setNews={setNewsP} showToast={showToast} />}
       {page === 'arrangement' && <EventsPage events={events} setEvents={setEventsP} showToast={showToast} />}
       {page === 'toppliste' && <CatchesPage catches={catches} setCatches={setCatchesP} members={members} waters={waters} showToast={showToast} />}
       {page === 'fiskevann' && <WatersPage waters={waters} setWaters={setWatersP} showToast={showToast} />}
+      {page === 'merch' && <MerchPage merch={merch} setMerch={setMerchP} showToast={showToast} />}
       {page === 'regler' && <RulesPage rules={rules} setRules={setRulesP} showToast={showToast} />}
       {page === 'medlemmer' && <MembersPage members={members} setMembers={setMembersP} showToast={showToast} />}
-
+      {page === 'spill' && <FishingGame />}
       <footer style={{ background: CO.deep, color: 'rgba(245,240,232,.5)', padding: '2rem 1rem', textAlign: 'center', borderTop: `1px solid rgba(200,146,42,.2)` }}>
-        <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1rem', color: CO.cream, marginBottom: 5 }}>
-          Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua
-        </p>
-        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Nøklevann, Oslo <br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
+        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1rem', color: CO.cream, marginBottom: 5 }}>Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua</p>
+        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Lillehammer, Innlandet<br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
       </footer>
-
       {toastMsg && <Toast message={toastMsg} />}
     </div>
   )
