@@ -191,27 +191,89 @@ function MemberAvatar({ name, photo, size = 48 }) {
 // Photo upload helper component
 function PhotoUpload({ photo, onPhoto, onClear, circle = false, label = 'Last opp bilde' }) {
   const [uploading, setUploading] = useState(false)
+  // offset = { x, y } as percentages (0–100), representing the background-position
+  const [offset, setOffset] = useState({ x: 50, y: 50 })
+  const dragRef = useRef(null)
+  const containerRef = useRef(null)
+
   const handleFile = async (e) => {
     const file = e.target.files[0]; if (!file) return
     setUploading(true)
-    try { const b64 = await fileToBase64(file, circle ? 200 : 800); onPhoto(b64) } catch {}
+    setOffset({ x: 50, y: 50 }) // reset position on new upload
+    try { const b64 = await fileToBase64(file, circle ? 400 : 1200); onPhoto(b64) } catch {}
     setUploading(false)
   }
+
+  // Pointer drag handlers — move the background-position
+  const onPointerDown = (e) => {
+    if (!photo) return
+    e.preventDefault()
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startOX: offset.x, startOY: offset.y }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+  }
+  const onPointerMove = (e) => {
+    if (!dragRef.current) return
+    const container = containerRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    const dx = e.clientX - dragRef.current.startX
+    const dy = e.clientY - dragRef.current.startY
+    // Convert pixel delta to percentage of container
+    const pctX = dragRef.current.startOX - (dx / rect.width)  * 100
+    const pctY = dragRef.current.startOY - (dy / rect.height) * 100
+    setOffset({ x: Math.max(0, Math.min(100, pctX)), y: Math.max(0, Math.min(100, pctY)) })
+  }
+  const onPointerUp = () => {
+    dragRef.current = null
+    window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerup', onPointerUp)
+  }
+
+  useEffect(() => () => {
+    window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerup', onPointerUp)
+  }, [])
+
+  const containerStyle = circle
+    ? { position: 'relative', width: 80, height: 80, borderRadius: '50%', border: `2px dashed ${photo ? '#c8922a' : '#d0c8b8'}`, overflow: 'hidden', flexShrink: 0, cursor: photo ? 'grab' : 'pointer', background: '#faf7f2' }
+    : { position: 'relative', width: '100%', height: 140, borderRadius: 8, border: `2px dashed ${photo ? '#c8922a' : '#d0c8b8'}`, overflow: 'hidden', cursor: photo ? 'grab' : 'pointer', background: '#faf7f2' }
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-      <div className={`photo-upload ${circle ? 'circle' : 'rect'}`} style={circle ? {} : { flex: 1, height: 120 }}>
-        {photo
-          ? <img src={photo} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <div style={{ textAlign: 'center', padding: '1rem' }}><div style={{ fontSize: circle ? 22 : 30 }}>📷</div><div style={{ fontSize: 11, color: CO.muted, marginTop: 4 }}>{label}</div></div>
-        }
-        <input type="file" accept="image/*" onChange={handleFile} />
+      <div ref={containerRef} style={containerStyle} onPointerDown={onPointerDown}>
+        {photo ? (
+          <>
+            <img src={photo} alt="preview" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${offset.x}% ${offset.y}%`, pointerEvents: 'none', userSelect: 'none', WebkitUserSelect: 'none' }} draggable={false} />
+            {/* Drag hint overlay */}
+            <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.75)', pointerEvents: 'none', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
+              ✥ Dra for å sentrere
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 4 }}>
+            <div style={{ fontSize: circle ? 20 : 28 }}>📷</div>
+            {!circle && <div style={{ fontSize: 11, color: CO.muted }}>{label}</div>}
+          </div>
+        )}
+        {/* Invisible file input — only active when no photo yet */}
+        {!photo && <input type="file" accept="image/*" onChange={handleFile} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />}
       </div>
-      {circle && <div style={{ flex: 1 }}>
-        <p style={{ fontSize: 12, color: CO.muted, lineHeight: 1.5 }}>Klikk for å laste opp bilde.</p>
-        {uploading && <p style={{ fontSize: 12, color: CO.gold, marginTop: 4 }}>Laster opp…</p>}
-        {photo && <button onClick={onClear} style={{ fontSize: 12, color: '#c0392b', marginTop: 6, textDecoration: 'underline', cursor: 'pointer' }}>Fjern bilde</button>}
-      </div>}
-      {!circle && uploading && <p style={{ fontSize: 12, color: CO.gold }}>Laster…</p>}
+
+      <div style={{ flex: 1 }}>
+        {!photo && <p style={{ fontSize: 12, color: CO.muted, lineHeight: 1.5 }}>Klikk for å laste opp bilde.</p>}
+        {photo && !circle && <p style={{ fontSize: 12, color: CO.muted, lineHeight: 1.5, marginBottom: 6 }}>Dra bildet for å velge utsnitt.</p>}
+        {uploading && <p style={{ fontSize: 12, color: CO.gold }}>Laster opp…</p>}
+        {photo && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+            <label style={{ fontSize: 12, color: CO.river, textDecoration: 'underline', cursor: 'pointer' }}>
+              Bytt bilde
+              <input type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+            </label>
+            <button onClick={onClear} style={{ fontSize: 12, color: '#c0392b', textDecoration: 'underline', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}>Fjern bilde</button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
