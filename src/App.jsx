@@ -34,11 +34,11 @@ const SEED = {
     { id: 9, name: 'Ingrid Korsmo', role: 'Miljøkontakt', badge: '', photo: '' },
   ],
   waters: [
-    { id: 1, name: 'Steinelva', location: 'Gausdal · 4,2 km', desc: 'Klubbens flaggskip. Rik bestand av storvokst ørret og harr.', tags: ['Ørret', 'Harr', 'Flue + sluk'] },
-    { id: 2, name: 'Langvann', location: 'Øyer · 1,8 km²', desc: 'Stille fjellvann med god ørretbestand. Ideelt for båtfiske og flue fra land.', tags: ['Ørret', 'Båt tillatt', 'Flue'] },
-    { id: 3, name: 'Håpetjernet', location: 'Lillehammer · 0,4 km²', desc: 'Nylig kalket og gjenopprettet. Åpner forventet sesong 2027.', tags: ['Ørret', 'Stengt til 2027'] },
-    { id: 4, name: 'Raudalselva', location: 'Ringebu · 2,8 km', desc: 'Villmarkspreget elv. Laks i nedre del i august.', tags: ['Laks', 'Ørret', 'Kun flue'] },
-    { id: 5, name: 'Bjørntjernet', location: 'Fåvang · 0,6 km²', desc: 'Lavlandssjø med stor abbor og noe gjedde. God for nybegynnere.', tags: ['Abbor', 'Gjedde', 'Alle metoder'] },
+    { id: 1, name: 'Steinelva', location: 'Gausdal · 4,2 km', desc: 'Klubbens flaggskip. Rik bestand av storvokst ørret og harr.', tags: ['Ørret', 'Harr', 'Flue + sluk'], mapUrl: 'https://maps.google.com/?q=Steinelva+Gausdal+Norway' },
+    { id: 2, name: 'Langvann', location: 'Øyer · 1,8 km²', desc: 'Stille fjellvann med god ørretbestand. Ideelt for båtfiske og flue fra land.', tags: ['Ørret', 'Båt tillatt', 'Flue'], mapUrl: 'https://maps.google.com/?q=Langvann+Øyer+Norway' },
+    { id: 3, name: 'Håpetjernet', location: 'Lillehammer · 0,4 km²', desc: 'Nylig kalket og gjenopprettet. Åpner forventet sesong 2027.', tags: ['Ørret', 'Stengt til 2027'], mapUrl: 'https://maps.google.com/?q=Lillehammer+Norway' },
+    { id: 4, name: 'Raudalselva', location: 'Ringebu · 2,8 km', desc: 'Villmarkspreget elv. Laks i nedre del i august.', tags: ['Laks', 'Ørret', 'Kun flue'], mapUrl: 'https://maps.google.com/?q=Raudalselva+Ringebu+Norway' },
+    { id: 5, name: 'Bjørntjernet', location: 'Fåvang · 0,6 km²', desc: 'Lavlandssjø med stor abbor og noe gjedde. God for nybegynnere.', tags: ['Abbor', 'Gjedde', 'Alle metoder'], mapUrl: 'https://maps.google.com/?q=Fåvang+Norway' },
   ],
   rules: [
     { id: 1, icon: '🎣', title: 'Fiskeregler', items: ['Gyldig fiskekort og statsavgift kreves', 'Minste tillatte størrelse: 25 cm (ørret), 30 cm (harr)', 'Maks 3 fisk per dag per person', 'Fang & slipp anbefales sterkt', 'Kun flue tillatt på Steinelva øvre del og Raudalselva', 'Levende agn er ikke tillatt'] },
@@ -242,7 +242,7 @@ function LoginScreen({ onLogin }) {
           </div>
         ))}
         {error && <p style={{ color: '#e07070', fontSize: 13, marginBottom: 8 }}>Feil brukernavn eller passord.</p>}
-        <button onClick={attempt} style={{ width: '100%', background: CO.gold, color: CO.deep, border: 'none', borderRadius: 6, padding: 12, fontWeight: 700, fontSize: 14, marginTop: 4, fontFamily: 'inherit', cursor: 'pointer' }}>Logg inn</button>
+        <button onClick={attempt} style={{ width: '100%', background: CO.gold, color: CO.deep, border: 'none', borderRadius: 6, padding: '10px 13px', fontWeight: 700, fontSize: 15, marginTop: 8, fontFamily: 'inherit', cursor: 'pointer' }}>Logg inn</button>
         <p style={{ marginTop: '1.25rem', fontSize: 12, color: 'rgba(245,240,232,.35)', borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: '1rem' }}>Kontakt styret for innloggingsinfo</p>
       </div>
     </div>
@@ -716,12 +716,12 @@ function MembersPage({ members, setMembers, showToast }) {
 
 // ─── Waters ───────────────────────────────────────────────────────────────────
 function WatersPage({ waters, setWaters, showToast }) {
-  const empty = { name: '', location: '', desc: '', tags: [] }
+  const empty = { name: '', location: '', desc: '', tags: [], mapUrl: '' }
   const [open, setOpen] = useState(false); const [editId, setEditId] = useState(null); const [form, setForm] = useState(empty); const [tagInput, setTagInput] = useState(''); const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
   const addTag = () => { const t = tagInput.trim(); if (t && !form.tags.includes(t)) setForm((p) => ({ ...p, tags: [...p.tags, t] })); setTagInput('') }
   const openNew = () => { setEditId(null); setForm(empty); setTagInput(''); setOpen(true) }
-  const openEdit = (w) => { setEditId(w.id); setForm({ ...w, tags: [...w.tags] }); setTagInput(''); setOpen(true) }
+  const openEdit = (w) => { setEditId(w.id); setForm({ ...w, tags: [...w.tags], mapUrl: w.mapUrl || '' }); setTagInput(''); setOpen(true) }
   const save = () => {
     if (!form.name.trim()) return
     const updated = editId ? waters.map((w) => w.id === editId ? { ...form, id: editId } : w) : [...waters, { ...form, id: nextId(waters) }]
@@ -738,6 +738,11 @@ function WatersPage({ waters, setWaters, showToast }) {
             <p style={{ fontSize: 12, color: CO.mist, marginBottom: 8, opacity: .8 }}>📍 {w.location}</p>
             <p style={{ fontSize: 13, color: CO.cream, lineHeight: 1.6, marginBottom: 10, opacity: .85 }}>{w.desc}</p>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>{w.tags.map((t) => <span key={t} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, border: `1px solid rgba(200,146,42,.35)`, color: CO.goldLt }}>{t}</span>)}</div>
+            {w.mapUrl && (
+              <a href={w.mapUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: CO.goldLt, marginBottom: 10, textDecoration: 'none', border: `1px solid rgba(200,146,42,.3)`, borderRadius: 5, padding: '3px 9px', background: 'rgba(200,146,42,.08)' }}>
+                🗺 Vis på Google Maps
+              </a>
+            )}
             <div style={{ display: 'flex', gap: 6 }}>
               <TFBtn small onClick={() => openEdit(w)} style={{ color: CO.cream, borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>✏ Rediger</TFBtn>
               <TFBtn small variant="danger" onClick={() => setConfirmId(w.id)} style={{ background: 'rgba(220,60,60,.15)', borderColor: 'rgba(220,60,60,.3)', color: '#ff9a9a' }}>🗑</TFBtn>
@@ -751,6 +756,8 @@ function WatersPage({ waters, setWaters, showToast }) {
           <FormRow label="Sted / størrelse"><TFInput value={form.location} onChange={(v) => f('location', v)} placeholder="Gausdal · 4,2 km" /></FormRow>
           <FormRow label="Beskrivelse"><TFInput value={form.desc} onChange={(v) => f('desc', v)} placeholder="Beskrivelse…" multiline /></FormRow>
           <FormRow label="Tags"><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>{form.tags.map((t) => <TagPill key={t} label={t} onRemove={() => f('tags', form.tags.filter((x) => x !== t))} />)}</div><div style={{ display: 'flex', gap: 6 }}><TFInput value={tagInput} onChange={setTagInput} placeholder="Ørret, Flue…" style={{ flex: 1 }} /><TFBtn variant="forest" onClick={addTag}>+</TFBtn></div></FormRow>
+          <FormRow label="Google Maps-lenke (valgfri)"><TFInput value={form.mapUrl || ''} onChange={(v) => f('mapUrl', v)} placeholder="https://maps.google.com/?q=Steinelva+Gausdal" /></FormRow>
+          <p style={{ fontSize: 11, color: CO.muted, marginTop: -8, marginBottom: 12 }}>Tips: søk opp stedet på maps.google.com, kopier URL-en fra adressefeltet</p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn><TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Legg til'}</TFBtn></div>
         </Modal>
       )}
@@ -794,186 +801,407 @@ function RulesPage({ rules, setRules, showToast }) {
   )
 }
 
-// ─── FISHING GAME ─────────────────────────────────────────────────────────────
-const FISH_TYPES = [
-  { emoji: '🐟', name: 'Ørret', points: 10, speed: 1.2, size: 28 },
-  { emoji: '🦈', name: 'Stor laks', points: 50, speed: 2.2, size: 32 },
-  { emoji: '🐠', name: 'Regnbueørret', points: 20, speed: 1.6, size: 26 },
-  { emoji: '🐡', name: 'Abbor', points: 5, speed: 0.9, size: 24 },
-  { emoji: '🦑', name: 'Mystisk fisk', points: 100, speed: 3, size: 22 },
-  { emoji: '🐟', name: 'Harr', points: 15, speed: 1.4, size: 26 },
-  { emoji: '🐙', name: 'Gjedde', points: 30, speed: 1.8, size: 30 },
-]
-
+// ─── FISHING GAME — Feeding Frenzy style ─────────────────────────────────────
 function FishingGame() {
-  const [gameState, setGameState] = useState('idle') // idle | playing | gameover
-  const [score, setScore] = useState(0)
-  const [highScore, setHighScore] = useState(() => parseInt(localStorage.getItem('tf_highscore') || '0'))
-  const [fish, setFish] = useState([])
-  const [splashes, setSplashes] = useState([])
-  const [bobberY, setBobberY] = useState(55)
-  const [bobberX, setBobberX] = useState(50)
-  const [timeLeft, setTimeLeft] = useState(30)
-  const [combo, setCombo] = useState(0)
-  const [lastCatch, setLastCatch] = useState(null)
-  const gameRef = useRef(null)
-  const animRef = useRef(null)
-  const fishRef = useRef([])
-  const tickRef = useRef(null)
-  const spawnRef = useRef(null)
-  const idRef = useRef(0)
+  const canvasRef = useRef(null)
+  const stateRef = useRef(null)
+  const rafRef = useRef(null)
+  const [display, setDisplay] = useState({ state: 'idle', score: 0, level: 1, lives: 3, highScore: parseInt(localStorage.getItem('tf_hs2') || '0'), playerSize: 1, message: '' })
 
-  const spawnFish = useCallback(() => {
-    const type = FISH_TYPES[Math.floor(Math.random() * FISH_TYPES.length)]
-    const fromLeft = Math.random() > 0.5
-    const newFish = {
-      id: idRef.current++,
-      type,
-      x: fromLeft ? -5 : 105,
-      y: 20 + Math.random() * 55,
-      dir: fromLeft ? 1 : -1,
-      speed: type.speed * (0.8 + Math.random() * 0.4),
+  const CANVAS_W = 700
+  const CANVAS_H = 420
+
+  // Level config
+  const LEVELS = [
+    { label: 'Level 1', fishCount: 6,  hazards: [],               speed: 1.0, desc: 'Spis kun mindre fisker!' },
+    { label: 'Level 2', fishCount: 8,  hazards: [],               speed: 1.3, desc: 'Fisken svømmer raskere!' },
+    { label: 'Level 3', fishCount: 9,  hazards: ['hook'],         speed: 1.5, desc: 'Pass deg for sluk! 🪝' },
+    { label: 'Level 4', fishCount: 11, hazards: ['hook'],         speed: 1.7, desc: 'Flere sluk i vannet!' },
+    { label: 'Level 5', fishCount: 12, hazards: ['hook','net'],   speed: 2.0, desc: 'Garn dukker opp! 🕸' },
+    { label: 'Level 6', fishCount: 14, hazards: ['hook','net'],   speed: 2.3, desc: 'Garn beveger seg nå!' },
+    { label: 'Level 7', fishCount: 16, hazards: ['hook','net','barrel'], speed: 2.6, desc: 'Gifttønner! ☠️' },
+    { label: 'Level 8', fishCount: 18, hazards: ['hook','net','barrel'], speed: 3.0, desc: 'Maksimal kaos!' },
+  ]
+
+  // Fish type definitions: [emoji, baseSize (px radius), points, label]
+  const FISH_DEFS = [
+    { emoji: '🐟', r: 10, pts: 5,   label: 'Småfisk' },
+    { emoji: '🐠', r: 14, pts: 10,  label: 'Regnbueørret' },
+    { emoji: '🐡', r: 18, pts: 15,  label: 'Abbor' },
+    { emoji: '🎣', r: 22, pts: 25,  label: 'Ørret' },
+    { emoji: '🦈', r: 30, pts: 50,  label: 'Hai' },
+    { emoji: '🐙', r: 26, pts: 40,  label: 'Gjedde' },
+  ]
+
+  function initGame(levelIdx) {
+    const lvl = LEVELS[Math.min(levelIdx, LEVELS.length - 1)]
+    const playerR = 12 + levelIdx * 2.5
+    const gs = {
+      state: 'playing',
+      level: levelIdx,
+      score: stateRef.current ? stateRef.current.score : 0,
+      lives: stateRef.current ? stateRef.current.lives : 3,
+      playerSize: playerR,
+      player: { x: CANVAS_W / 2, y: CANVAS_H / 2, vx: 0, vy: 0, r: playerR },
+      fish: [],
+      hazards: [],
+      keys: {},
+      eatCount: 0,
+      eatTarget: 8 + levelIdx * 2,
+      flashMsg: '',
+      flashTimer: 0,
+      levelConfig: lvl,
     }
-    setFish((prev) => [...prev, newFish])
+    // Spawn fish
+    for (let i = 0; i < lvl.fishCount; i++) spawnFishInState(gs, lvl.speed)
+    // Spawn hazards
+    lvl.hazards.forEach(h => spawnHazard(gs, h, lvl.speed))
+    return gs
+  }
+
+  function spawnFishInState(gs, speedMult) {
+    const def = FISH_DEFS[Math.floor(Math.random() * FISH_DEFS.length)]
+    const fromLeft = Math.random() > 0.5
+    gs.fish.push({
+      ...def,
+      id: Math.random(),
+      x: fromLeft ? -30 : CANVAS_W + 30,
+      y: 40 + Math.random() * (CANVAS_H - 80),
+      vx: (fromLeft ? 1 : -1) * (0.6 + Math.random() * 0.6) * speedMult,
+      vy: (Math.random() - 0.5) * 0.5 * speedMult,
+    })
+  }
+
+  function spawnHazard(gs, type, speedMult) {
+    if (type === 'hook') {
+      gs.hazards.push({ type: 'hook', id: Math.random(), x: 50 + Math.random() * (CANVAS_W - 100), y: -20, vy: 1.2 * speedMult, vx: 0, w: 12, h: 28 })
+    } else if (type === 'net') {
+      gs.hazards.push({ type: 'net', id: Math.random(), x: Math.random() > 0.5 ? -80 : CANVAS_W + 80, y: 60 + Math.random() * (CANVAS_H - 120), vx: (Math.random() > 0.5 ? 1 : -1) * 0.8 * speedMult, vy: 0, w: 60, h: 80 })
+    } else if (type === 'barrel') {
+      gs.hazards.push({ type: 'barrel', id: Math.random(), x: 40 + Math.random() * (CANVAS_W - 80), y: -30, vy: 1.5 * speedMult, vx: (Math.random() - 0.5) * 1.2 * speedMult, r: 18 })
+    }
+  }
+
+  function gameLoop() {
+    const gs = stateRef.current
+    if (!gs || gs.state !== 'playing') return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+
+    // Move player
+    const SPEED = 3.5
+    if (gs.keys['ArrowLeft']  || gs.keys['a']) gs.player.vx = Math.max(gs.player.vx - 0.8, -SPEED)
+    else if (gs.keys['ArrowRight'] || gs.keys['d']) gs.player.vx = Math.min(gs.player.vx + 0.8, SPEED)
+    else gs.player.vx *= 0.85
+    if (gs.keys['ArrowUp']   || gs.keys['w']) gs.player.vy = Math.max(gs.player.vy - 0.8, -SPEED)
+    else if (gs.keys['ArrowDown']  || gs.keys['s']) gs.player.vy = Math.min(gs.player.vy + 0.8, SPEED)
+    else gs.player.vy *= 0.85
+
+    gs.player.x = Math.max(gs.player.r, Math.min(CANVAS_W - gs.player.r, gs.player.x + gs.player.vx))
+    gs.player.y = Math.max(gs.player.r, Math.min(CANVAS_H - gs.player.r, gs.player.y + gs.player.vy))
+
+    // Move fish
+    const lvl = gs.levelConfig
+    gs.fish.forEach(f => {
+      f.x += f.vx; f.y += f.vy
+      if (f.x < -60 || f.x > CANVAS_W + 60) { f.x = f.vx > 0 ? -30 : CANVAS_W + 30; f.y = 40 + Math.random() * (CANVAS_H - 80) }
+      if (f.y < 20 || f.y > CANVAS_H - 20) f.vy *= -1
+    })
+
+    // Move hazards
+    gs.hazards.forEach(h => {
+      if (h.type === 'hook') {
+        h.y += h.vy
+        if (h.y > CANVAS_H + 40) { h.y = -20; h.x = 50 + Math.random() * (CANVAS_W - 100) }
+      } else if (h.type === 'net') {
+        h.x += h.vx
+        if (h.x < -100 || h.x > CANVAS_W + 100) h.vx *= -1
+      } else if (h.type === 'barrel') {
+        h.x += h.vx; h.y += h.vy
+        if (h.x < h.r || h.x > CANVAS_W - h.r) h.vx *= -1
+        if (h.y > CANVAS_H + 40) { h.y = -30; h.x = 40 + Math.random() * (CANVAS_W - 80) }
+      }
+    })
+
+    // Check fish collisions
+    gs.fish = gs.fish.filter(f => {
+      const dx = gs.player.x - f.x, dy = gs.player.y - f.y
+      const dist = Math.sqrt(dx*dx + dy*dy)
+      if (dist < gs.player.r + f.r - 4) {
+        if (f.r < gs.player.r) {
+          // Eat it!
+          gs.score += f.pts
+          gs.eatCount++
+          gs.player.r = Math.min(gs.player.r + 0.4, 55)
+          gs.flashMsg = `+${f.pts} ${f.label}!`
+          gs.flashTimer = 40
+          spawnFishInState(gs, lvl.speed)
+          return false
+        } else {
+          // Eaten by bigger fish — lose life
+          gs.lives--
+          gs.flashMsg = gs.lives > 0 ? `💀 Au! ${gs.lives} liv igjen` : '💀 Game over!'
+          gs.flashTimer = 60
+          gs.player.x = CANVAS_W / 2; gs.player.y = CANVAS_H / 2; gs.player.vx = 0; gs.player.vy = 0
+          if (gs.lives <= 0) { endGame(gs); return true }
+        }
+      }
+      return true
+    })
+
+    // Check hazard collisions
+    if (gs.state === 'playing') {
+      for (const h of gs.hazards) {
+        let hit = false
+        if (h.type === 'hook') {
+          if (gs.player.x > h.x - h.w/2 - gs.player.r && gs.player.x < h.x + h.w/2 + gs.player.r && gs.player.y > h.y - gs.player.r && gs.player.y < h.y + h.h + gs.player.r) hit = true
+        } else if (h.type === 'net') {
+          if (gs.player.x > h.x - gs.player.r && gs.player.x < h.x + h.w + gs.player.r && gs.player.y > h.y - gs.player.r && gs.player.y < h.y + h.h + gs.player.r) hit = true
+        } else if (h.type === 'barrel') {
+          const dx = gs.player.x - h.x, dy = gs.player.y - h.y
+          if (Math.sqrt(dx*dx+dy*dy) < gs.player.r + h.r) hit = true
+        }
+        if (hit) {
+          gs.lives--
+          gs.flashMsg = gs.lives > 0 ? `💥 Truffet! ${gs.lives} liv igjen` : '💥 Game over!'
+          gs.flashTimer = 70
+          gs.player.x = CANVAS_W / 2; gs.player.y = CANVAS_H / 2; gs.player.vx = 0; gs.player.vy = 0
+          if (gs.lives <= 0) { endGame(gs); break }
+        }
+      }
+    }
+
+    // Level up
+    if (gs.state === 'playing' && gs.eatCount >= gs.eatTarget) {
+      const nextLevel = gs.level + 1
+      if (nextLevel >= LEVELS.length) {
+        gs.flashMsg = '🏆 Du vant hele spillet!'
+        gs.flashTimer = 120
+        endGame(gs)
+      } else {
+        const saved = { score: gs.score, lives: Math.min(gs.lives + 1, 5) }
+        stateRef.current = { ...initGame(nextLevel), score: saved.score, lives: saved.lives }
+        stateRef.current.flashMsg = `🎉 ${LEVELS[nextLevel].label}! ${LEVELS[nextLevel].desc}`
+        stateRef.current.flashTimer = 90
+        setDisplay(d => ({ ...d, level: nextLevel + 1, score: saved.score, lives: saved.lives }))
+        rafRef.current = requestAnimationFrame(gameLoop)
+        return
+      }
+    }
+
+    if (gs.flashTimer > 0) gs.flashTimer--
+
+    // Draw
+    draw(ctx, gs)
+
+    setDisplay(d => ({ ...d, score: gs.score, lives: gs.lives, playerSize: Math.round(gs.player.r), level: gs.level + 1 }))
+    rafRef.current = requestAnimationFrame(gameLoop)
+  }
+
+  function endGame(gs) {
+    gs.state = 'gameover'
+    const hs = Math.max(parseInt(localStorage.getItem('tf_hs2') || '0'), gs.score)
+    localStorage.setItem('tf_hs2', String(hs))
+    setDisplay(d => ({ ...d, state: 'gameover', score: gs.score, highScore: hs }))
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+  }
+
+  function draw(ctx, gs) {
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H)
+    grad.addColorStop(0, '#1a4a6e')
+    grad.addColorStop(0.5, '#2d6a8f')
+    grad.addColorStop(1, '#0f2a40')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+
+    // Water shimmer lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)'
+    ctx.lineWidth = 1
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath()
+      const y = 60 + i * 60
+      ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y)
+      ctx.stroke()
+    }
+
+    // Bubbles effect (static)
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'
+    for (let i = 0; i < 12; i++) {
+      const bx = (i * 137 + 30) % CANVAS_W
+      const by = (i * 89 + 20) % CANVAS_H
+      ctx.beginPath(); ctx.arc(bx, by, 2 + (i % 3), 0, Math.PI*2); ctx.fill()
+    }
+
+    // Fish
+    ctx.font = '20px serif'
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    gs.fish.forEach(f => {
+      ctx.save()
+      ctx.translate(f.x, f.y)
+      if (f.vx < 0) ctx.scale(-1, 1)
+      const fontSize = Math.round(f.r * 1.6)
+      ctx.font = `${fontSize}px serif`
+      // Dim fish bigger than player (danger)
+      ctx.globalAlpha = f.r >= gs.player.r ? 1.0 : 0.9
+      ctx.fillText(f.emoji, 0, 0)
+      // Red glow on dangerous fish
+      if (f.r >= gs.player.r) {
+        ctx.globalAlpha = 0.25
+        ctx.fillStyle = '#ff4444'
+        ctx.beginPath(); ctx.arc(0, 0, f.r, 0, Math.PI*2); ctx.fill()
+      }
+      ctx.restore()
+    })
+
+    // Hazards
+    gs.hazards.forEach(h => {
+      ctx.save()
+      if (h.type === 'hook') {
+        ctx.font = '24px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillText('🪝', h.x, h.y + h.h/2)
+        // Fishing line
+        ctx.strokeStyle = 'rgba(200,200,200,0.5)'; ctx.lineWidth = 1.5
+        ctx.beginPath(); ctx.moveTo(h.x, 0); ctx.lineTo(h.x, h.y); ctx.stroke()
+      } else if (h.type === 'net') {
+        ctx.globalAlpha = 0.55
+        ctx.fillStyle = '#8B6914'
+        ctx.fillRect(h.x, h.y, h.w, h.h)
+        ctx.strokeStyle = '#c8922a'; ctx.lineWidth = 1.5
+        // Net grid
+        for (let nx = 0; nx <= h.w; nx += 12) { ctx.beginPath(); ctx.moveTo(h.x+nx, h.y); ctx.lineTo(h.x+nx, h.y+h.h); ctx.stroke() }
+        for (let ny = 0; ny <= h.h; ny += 12) { ctx.beginPath(); ctx.moveTo(h.x, h.y+ny); ctx.lineTo(h.x+h.w, h.y+ny); ctx.stroke() }
+        ctx.globalAlpha = 1
+      } else if (h.type === 'barrel') {
+        ctx.font = `${h.r*2}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillText('🛢️', h.x, h.y)
+      }
+      ctx.restore()
+    })
+
+    // Player fish
+    ctx.save()
+    ctx.translate(gs.player.x, gs.player.y)
+    if (gs.player.vx < 0) ctx.scale(-1, 1)
+    const pSize = Math.round(gs.player.r * 1.8)
+    ctx.font = `${pSize}px serif`
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText('🐟', 0, 0)
+    // Glow ring
+    ctx.strokeStyle = 'rgba(200,230,255,0.4)'; ctx.lineWidth = 2
+    ctx.beginPath(); ctx.arc(0, 0, gs.player.r + 3, 0, Math.PI*2); ctx.stroke()
+    ctx.restore()
+
+    // Flash message
+    if (gs.flashTimer > 0) {
+      ctx.save()
+      ctx.globalAlpha = Math.min(1, gs.flashTimer / 20)
+      ctx.fillStyle = gs.flashMsg.includes('💀') || gs.flashMsg.includes('💥') ? '#ff6b6b' : '#f0d070'
+      ctx.font = 'bold 20px Inter, sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText(gs.flashMsg, CANVAS_W/2, CANVAS_H/2 - 60)
+      ctx.restore()
+    }
+
+    // Progress bar
+    const prog = Math.min(gs.eatCount / gs.eatTarget, 1)
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'
+    ctx.fillRect(10, 10, 160, 10)
+    ctx.fillStyle = '#c8922a'
+    ctx.fillRect(10, 10, 160 * prog, 10)
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1
+    ctx.strokeRect(10, 10, 160, 10)
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '10px Inter, sans-serif'
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top'
+    ctx.fillText(`Spist: ${gs.eatCount}/${gs.eatTarget}`, 12, 24)
+  }
+
+  function startGame() {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    stateRef.current = initGame(0)
+    stateRef.current.score = 0
+    stateRef.current.lives = 3
+    setDisplay(d => ({ ...d, state: 'playing', score: 0, level: 1, lives: 3 }))
+    rafRef.current = requestAnimationFrame(gameLoop)
+  }
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!stateRef.current) return
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault()
+      stateRef.current.keys[e.key] = e.type === 'keydown'
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('keyup', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKey)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
   }, [])
 
-  const startGame = () => {
-    setGameState('playing'); setScore(0); setTimeLeft(30); setCombo(0); setLastCatch(null)
-    setFish([]); setSplashes([])
-    fishRef.current = []
+  // Touch/mobile controls
+  const handleTouch = (dir) => {
+    if (!stateRef.current) return
+    Object.keys(stateRef.current.keys).forEach(k => { stateRef.current.keys[k] = false })
+    if (dir) stateRef.current.keys[dir] = true
   }
+  const stopTouch = () => { if (stateRef.current) stateRef.current.keys = {} }
 
-  useEffect(() => {
-    if (gameState !== 'playing') return
-    spawnRef.current = setInterval(spawnFish, 1200)
-    tickRef.current = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) { setGameState('gameover'); clearInterval(spawnRef.current); clearInterval(tickRef.current); return 0 }
-        return t - 1
-      })
-      setFish((prev) => prev.map((f) => ({ ...f, x: f.x + f.dir * f.speed })).filter((f) => f.x > -15 && f.x < 115))
-    }, 100)
-    return () => { clearInterval(spawnRef.current); clearInterval(tickRef.current) }
-  }, [gameState, spawnFish])
-
-  useEffect(() => {
-    if (gameState === 'gameover') {
-      setHighScore((prev) => { const hs = Math.max(prev, score); localStorage.setItem('tf_highscore', String(hs)); return hs })
-    }
-  }, [gameState, score])
-
-  const handleCast = (e) => {
-    if (gameState !== 'playing') return
-    const rect = gameRef.current.getBoundingClientRect()
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
-    const x = ((clientX - rect.left) / rect.width) * 100
-    const y = ((clientY - rect.top) / rect.height) * 100
-    setBobberX(x); setBobberY(y)
-    // Check if any fish is near the bobber
-    let caught = false
-    setFish((prev) => {
-      const remaining = prev.filter((f) => {
-        const dx = Math.abs(f.x - x); const dy = Math.abs(f.y - y)
-        if (dx < 8 && dy < 8) {
-          caught = true
-          const pts = f.type.points
-          setScore((s) => s + pts)
-          setCombo((c) => c + 1)
-          setLastCatch({ name: f.type.name, points: pts, x, y })
-          setSplashes((sp) => [...sp, { id: Date.now(), x, y }])
-          setTimeout(() => setSplashes((sp) => sp.filter((s) => s.id !== Date.now())), 700)
-          return false
-        }
-        return true
-      })
-      return remaining
-    })
-    if (!caught) setCombo(0)
-  }
-
-  const barColor = timeLeft > 15 ? CO.river : timeLeft > 7 ? CO.gold : '#e74c3c'
+  const hs = display.highScore
 
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
         <div><p className="tf-label">Klubbens arkadeseksjon</p><h2 className="tf-title">🎮 Fiskespill</h2></div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: CO.muted }}>🏆 Rekord: <b style={{ color: CO.gold }}>{highScore}</b></span>
-          {gameState !== 'idle' && <TFBtn variant="primary" onClick={startGame}>{gameState === 'playing' ? '↺ Start på nytt' : '▶ Spill igjen'}</TFBtn>}
-        </div>
+        <span style={{ fontSize: 13, color: CO.muted }}>🏆 Rekord: <b style={{ color: CO.gold }}>{hs}</b></span>
       </div>
 
-      {gameState === 'idle' && (
-        <div style={{ textAlign: 'center', padding: '2rem' }}>
-          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎣</div>
-          <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.forest, marginBottom: '.75rem' }}>Klar til å fiske?</h3>
-          <p style={{ color: CO.muted, marginBottom: '1.5rem', fontSize: 14, maxWidth: 380, margin: '0 auto 1.5rem' }}>Klikk eller trykk på fisken for å fange dem. Du har 30 sekunder — få så høy score som mulig!</p>
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2rem' }}>
-            {FISH_TYPES.map((f) => <div key={f.name} style={{ background: CO.white, border: `1px solid ${CO.creamDk}`, borderRadius: 8, padding: '.5rem .85rem', fontSize: 13 }}>{f.emoji} {f.name} — <b style={{ color: CO.gold }}>{f.points}p</b></div>)}
+      {display.state === 'idle' && (
+        <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🐟</div>
+          <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.forest, marginBottom: '.75rem' }}>Feeding Frenzy</h3>
+          <p style={{ color: CO.muted, maxWidth: 420, margin: '0 auto 1rem', fontSize: 14, lineHeight: 1.6 }}>
+            Styr fisken din med <b>piltastene</b> (eller WASD). Spis fisker som er <b>mindre</b> enn deg og voks! Spiser du en større fisk — mister du et liv. Pass deg for sluk 🪝, garn 🕸 og gifttønner ☠️
+          </p>
+          <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+            {LEVELS.map((l, i) => <span key={i} style={{ fontSize: 12, background: CO.creamDk, padding: '3px 10px', borderRadius: 20, color: CO.muted }}>{l.label}: {l.desc}</span>)}
           </div>
           <TFBtn variant="primary" onClick={startGame} style={{ fontSize: 16, padding: '12px 32px' }}>▶ Start spillet</TFBtn>
         </div>
       )}
 
-      {(gameState === 'playing' || gameState === 'gameover') && (
+      {(display.state === 'playing' || display.state === 'gameover') && (
         <>
-          {/* Scoreboard */}
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: CO.forest }}>⏱ {timeLeft}s</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: CO.forest }}>Score: <b style={{ color: CO.gold }}>{score}</b></span>
-                {combo > 1 && <span style={{ fontSize: 13, fontWeight: 700, color: '#e74c3c' }}>🔥 x{combo} combo!</span>}
-              </div>
-              <div style={{ height: 8, background: CO.creamDk, borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${(timeLeft / 30) * 100}%`, background: barColor, borderRadius: 4, transition: 'width .1s, background .5s' }} />
-              </div>
-            </div>
+          {/* HUD */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+            <span style={{ fontWeight: 700, color: CO.forest, fontSize: 14 }}>Level {display.level} / {LEVELS.length}</span>
+            <span style={{ fontSize: 14, color: CO.forest }}>Score: <b style={{ color: CO.gold }}>{display.score}</b></span>
+            <span style={{ fontSize: 20 }}>{'❤️'.repeat(display.lives)}{'🖤'.repeat(Math.max(0, 3 - display.lives))}</span>
           </div>
 
-          {/* Game canvas */}
-          <div ref={gameRef} className="game-canvas"
-            style={{ height: 340, touchAction: 'none' }}
-            onClick={handleCast}
-            onTouchStart={handleCast}>
+          {/* Canvas */}
+          <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
+            style={{ width: '100%', borderRadius: 12, display: 'block', maxHeight: 500 }} />
 
-            {/* Water lines */}
-            {[30, 50, 70, 90].map((y) => <div key={y} className="water-line" style={{ top: `${y}%`, opacity: 0.15 + y * 0.002 }} />)}
-
-            {/* Fish */}
-            {fish.map((f) => (
-              <div key={f.id} className="fish" style={{ left: `${f.x}%`, top: `${f.y}%`, fontSize: f.type.size, transform: f.dir === -1 ? 'scaleX(-1)' : 'none' }}>
-                {f.type.emoji}
-              </div>
+          {/* Mobile controls */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 10, maxWidth: 200, margin: '10px auto 0' }}>
+            {[['', '⬆️', 'ArrowUp'], ['⬅️', '', 'ArrowLeft'], ['', '⬇️', 'ArrowDown'], ['➡️', '', 'ArrowRight']].map(([a, b, dir], i) => (
+              <button key={i} onTouchStart={() => handleTouch(dir)} onTouchEnd={stopTouch} onMouseDown={() => handleTouch(dir)} onMouseUp={stopTouch}
+                style={{ padding: '10px', fontSize: '1.2rem', borderRadius: 8, border: `1px solid ${CO.creamDk}`, background: CO.white, cursor: 'pointer', visibility: (a || b) ? 'visible' : 'hidden' }}>
+                {a || b}
+              </button>
             ))}
-
-            {/* Bobber */}
-            {gameState === 'playing' && <div className="bobber" style={{ left: `${bobberX}%`, top: `${bobberY}%`, transform: 'translate(-50%,-50%)' }} />}
-
-            {/* Splash effects */}
-            {splashes.map((s) => <div key={s.id} className="splash" style={{ left: `${s.x}%`, top: `${s.y}%`, transform: 'translate(-50%,-50%)' }}>💦</div>)}
-
-            {/* Last catch popup */}
-            {lastCatch && (
-              <div style={{ position: 'absolute', left: `${Math.min(Math.max(lastCatch.x, 15), 80)}%`, top: `${Math.max(lastCatch.y - 12, 5)}%`, background: CO.gold, color: CO.deep, padding: '3px 10px', borderRadius: 20, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', animation: 'splash .8s ease-out forwards', pointerEvents: 'none' }}>
-                +{lastCatch.points} {lastCatch.name}
-              </div>
-            )}
-
-            {/* Overlay text */}
-            {gameState === 'playing' && fish.length === 0 && (
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.4)', fontSize: 16 }}>Fisken er på vei…</div>
-            )}
           </div>
+          <p style={{ textAlign: 'center', fontSize: 11, color: CO.muted, marginTop: 4 }}>Piltaster / WASD på PC · Knapper på mobil</p>
 
-          {/* Game over */}
-          {gameState === 'gameover' && (
-            <div style={{ textAlign: 'center', padding: '2rem', background: CO.forest, borderRadius: '0 0 12px 12px', marginTop: 0 }}>
-              <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.gold, marginBottom: '.5rem' }}>Timen er ute!</p>
-              <p style={{ fontSize: '2rem', fontWeight: 700, color: CO.cream, marginBottom: '.25rem' }}>{score} poeng</p>
-              {score >= highScore && score > 0 && <p style={{ color: CO.gold, fontSize: 14, marginBottom: '1rem' }}>🏆 Ny personrekord!</p>}
-              {score < highScore && <p style={{ color: CO.mist, fontSize: 13, marginBottom: '1rem', opacity: .7 }}>Rekord: {highScore} poeng</p>}
+          {display.state === 'gameover' && (
+            <div style={{ textAlign: 'center', marginTop: '1.5rem', background: CO.forest, borderRadius: 12, padding: '2rem' }}>
+              <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.gold, marginBottom: '.5rem' }}>Game Over!</p>
+              <p style={{ fontSize: '2rem', fontWeight: 700, color: CO.cream, marginBottom: '.25rem' }}>{display.score} poeng</p>
+              {display.score >= hs && display.score > 0 && <p style={{ color: CO.gold, fontSize: 14, marginBottom: '1rem' }}>🏆 Ny personrekord!</p>}
+              {display.score < hs && <p style={{ color: CO.mist, fontSize: 13, marginBottom: '1rem', opacity: .7 }}>Rekord: {hs} poeng</p>}
               <TFBtn variant="primary" onClick={startGame} style={{ fontSize: 15, padding: '10px 28px' }}>▶ Spill igjen</TFBtn>
             </div>
           )}
