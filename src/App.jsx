@@ -807,485 +807,427 @@ function RulesPage({ rules, setRules, showToast }) {
   )
 }
 
-// ─── FISHING GAME — Feeding Frenzy style ─────────────────────────────────────
+// ─── FISHING GAME — Feeding Frenzy ──────────────────────────────────────────
+const LEVELS_CFG = [
+  { num: 1, fishOnScreen: 12, hazards: [],                     speedMult: 1.0, eatTarget: 8,  desc: 'Spis de minste fiskene!' },
+  { num: 2, fishOnScreen: 14, hazards: [],                     speedMult: 1.2, eatTarget: 10, desc: 'Raskere fisk!' },
+  { num: 3, fishOnScreen: 15, hazards: ['hook'],               speedMult: 1.4, eatTarget: 12, desc: 'Pass deg for sluk! 🪝' },
+  { num: 4, fishOnScreen: 16, hazards: ['hook','hook'],        speedMult: 1.6, eatTarget: 14, desc: 'Enda flere sluk!' },
+  { num: 5, fishOnScreen: 17, hazards: ['hook','net'],         speedMult: 1.8, eatTarget: 16, desc: 'Garn i vannet! 🕸' },
+  { num: 6, fishOnScreen: 18, hazards: ['hook','net','net'],   speedMult: 2.0, eatTarget: 18, desc: 'Dobbelt garn!' },
+  { num: 7, fishOnScreen: 18, hazards: ['hook','net','barrel'],speedMult: 2.2, eatTarget: 20, desc: 'Gifttønner! ☠️' },
+  { num: 8, fishOnScreen: 20, hazards: ['hook','net','barrel','barrel'], speedMult: 2.5, eatTarget: 22, desc: 'Maksimal kaos!' },
+]
+
+// Fish types — sorted small to large
+const FISH_TYPES_G = [
+  { r: 6,  color: '#7ec8e3', tail: '#4aaac8', pts: 2,  label: 'Småfisk',      spots: false },
+  { r: 7,  color: '#a8d8a8', tail: '#6ab86a', pts: 3,  label: 'Grønnfisk',    spots: false },
+  { r: 8,  color: '#c0d8f0', tail: '#80b0e0', pts: 3,  label: 'Sildefisk',    spots: false },
+  { r: 10, color: '#f4a460', tail: '#d2865a', pts: 5,  label: 'Liten ørret',  spots: true  },
+  { r: 12, color: '#ff9eb5', tail: '#e07090', pts: 8,  label: 'Regnbueørret', spots: true  },
+  { r: 15, color: '#90ee90', tail: '#55aa55', pts: 12, label: 'Abbor',        spots: true  },
+  { r: 19, color: '#e8a030', tail: '#c07020', pts: 20, label: 'Ørret',        spots: true  },
+  { r: 24, color: '#708060', tail: '#506040', pts: 35, label: 'Gjedde',       spots: false },
+  { r: 30, color: '#cc6644', tail: '#aa4422', pts: 60, label: 'Stor laks',    spots: false },
+]
+
+function makeFish(playerR, lvlSpeed, canvasW, canvasH, forceSmall) {
+  // Weight toward small fish — more smalls available when player is small
+  const maxIdx = forceSmall ? 4 : Math.min(Math.floor(playerR / 4), FISH_TYPES_G.length - 1)
+  const weights = FISH_TYPES_G.slice(0, maxIdx + 1).map((_, i) => maxIdx - i + 1)
+  const total = weights.reduce((a, b) => a + b, 0)
+  let rand = Math.random() * total
+  let idx = 0
+  for (let i = 0; i < weights.length; i++) { rand -= weights[i]; if (rand <= 0) { idx = i; break } }
+  const type = FISH_TYPES_G[idx]
+  const fromLeft = Math.random() > 0.5
+  return {
+    ...type,
+    id: Math.random() + Date.now(),
+    x: fromLeft ? -type.r - 5 : canvasW + type.r + 5,
+    y: type.r + 10 + Math.random() * (canvasH - type.r * 2 - 20),
+    vx: (fromLeft ? 1 : -1) * (0.6 + Math.random() * 0.5) * lvlSpeed,
+    vy: (Math.random() - 0.5) * 0.4 * lvlSpeed,
+  }
+}
+
+function makeHazard(type, canvasW, canvasH, lvlSpeed) {
+  if (type === 'hook') {
+    return { type, id: Math.random(), x: 60 + Math.random() * (canvasW - 120), y: -30, vy: 1.0 * lvlSpeed, vx: 0 }
+  } else if (type === 'net') {
+    const fromLeft = Math.random() > 0.5
+    return { type, id: Math.random(), x: fromLeft ? -70 : canvasW + 70, y: 40 + Math.random() * (canvasH - 120), vx: (fromLeft ? 1 : -1) * 0.7 * lvlSpeed, vy: 0, w: 55, h: 75 }
+  } else {
+    return { type, id: Math.random(), x: 40 + Math.random() * (canvasW - 80), y: -35, vy: 1.2 * lvlSpeed, vx: (Math.random() - 0.5) * lvlSpeed, r: 20 }
+  }
+}
+
+function drawFishShape(ctx, x, y, r, color, tail, facingLeft, spots, danger) {
+  ctx.save()
+  ctx.translate(x, y)
+  if (facingLeft) ctx.scale(-1, 1)
+  // Body
+  ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.62, 0, 0, Math.PI * 2)
+  ctx.fillStyle = color; ctx.fill()
+  // Tail
+  ctx.beginPath(); ctx.moveTo(-r * 0.75, 0); ctx.lineTo(-r * 1.45, -r * 0.55); ctx.lineTo(-r * 1.45, r * 0.55); ctx.closePath()
+  ctx.fillStyle = tail; ctx.fill()
+  // Dorsal fin
+  ctx.beginPath(); ctx.moveTo(-r * 0.05, -r * 0.62); ctx.lineTo(r * 0.3, -r * 1.05); ctx.lineTo(r * 0.62, -r * 0.62); ctx.closePath()
+  ctx.fillStyle = tail; ctx.fill()
+  // Spots
+  if (spots) {
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.arc((i - 1.5) * r * 0.32, (i % 2 === 0 ? -1 : 1) * r * 0.14, r * 0.09, 0, Math.PI * 2); ctx.fill()
+    }
+  }
+  // Eye
+  ctx.beginPath(); ctx.arc(r * 0.48, -r * 0.1, Math.max(1.5, r * 0.14), 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill()
+  ctx.beginPath(); ctx.arc(r * 0.5, -r * 0.1, Math.max(0.8, r * 0.075), 0, Math.PI * 2); ctx.fillStyle = '#111'; ctx.fill()
+  // Danger outline only — dashed, no bubble
+  if (danger) {
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(255,70,70,0.8)'; ctx.lineWidth = 1.5
+    ctx.beginPath(); ctx.ellipse(0, 0, r + 3, r * 0.62 + 3, 0, 0, Math.PI * 2); ctx.stroke()
+    ctx.setLineDash([])
+  }
+  ctx.restore()
+}
+
 function FishingGame() {
   const canvasRef = useRef(null)
-  const stateRef = useRef(null)
+  const gsRef = useRef(null)   // mutable game state — never triggers re-render
   const rafRef = useRef(null)
-  const [display, setDisplay] = useState({ state: 'idle', score: 0, level: 1, lives: 3, highScore: parseInt(localStorage.getItem('tf_hs2') || '0'), playerSize: 1, message: '' })
+  const [ui, setUi] = useState({ phase: 'idle', score: 0, level: 1, lives: 3, eaten: 0, target: 8, hs: parseInt(localStorage.getItem('tf_hs3')||'0') })
 
-  const CANVAS_W = 700
-  const CANVAS_H = 420
+  const CW = 700, CH = 420
 
-  // Level config
-  const LEVELS = [
-    { label: 'Level 1', fishCount: 6,  hazards: [],               speed: 1.0, desc: 'Spis kun mindre fisker!' },
-    { label: 'Level 2', fishCount: 8,  hazards: [],               speed: 1.3, desc: 'Fisken svømmer raskere!' },
-    { label: 'Level 3', fishCount: 9,  hazards: ['hook'],         speed: 1.5, desc: 'Pass deg for sluk! 🪝' },
-    { label: 'Level 4', fishCount: 11, hazards: ['hook'],         speed: 1.7, desc: 'Flere sluk i vannet!' },
-    { label: 'Level 5', fishCount: 12, hazards: ['hook','net'],   speed: 2.0, desc: 'Garn dukker opp! 🕸' },
-    { label: 'Level 6', fishCount: 14, hazards: ['hook','net'],   speed: 2.3, desc: 'Garn beveger seg nå!' },
-    { label: 'Level 7', fishCount: 16, hazards: ['hook','net','barrel'], speed: 2.6, desc: 'Gifttønner! ☠️' },
-    { label: 'Level 8', fishCount: 18, hazards: ['hook','net','barrel'], speed: 3.0, desc: 'Maksimal kaos!' },
-  ]
-
-  // Fish type definitions — weighted toward small fish so player can actually level up
-  // color = body color, tailColor = tail, spots = decorative dots
-  const FISH_DEFS = [
-    { r: 7,  pts: 3,  label: 'Småfisk',       color: '#7ec8e3', tailColor: '#5ab0cc', spots: false }, // tiny blue
-    { r: 8,  pts: 4,  label: 'Morderfisk',    color: '#a8d8a8', tailColor: '#78b878', spots: false }, // tiny green
-    { r: 9,  pts: 5,  label: 'Liten ørret',   color: '#f4a460', tailColor: '#d2865a', spots: true  }, // small orange
-    { r: 7,  pts: 3,  label: 'Sildefisk',     color: '#c0d8f0', tailColor: '#90b8e0', spots: false }, // tiny silver
-    { r: 11, pts: 8,  label: 'Regnbueørret',  color: '#ff9eb5', tailColor: '#e07090', spots: true  }, // medium pink
-    { r: 13, pts: 12, label: 'Abbor',         color: '#90ee90', tailColor: '#55aa55', spots: true  }, // medium green
-    { r: 16, pts: 20, label: 'Ørret',         color: '#e8a030', tailColor: '#c07020', spots: true  }, // large orange
-    { r: 20, pts: 35, label: 'Gjedde',        color: '#708060', tailColor: '#506040', spots: false }, // large grey-green
-    { r: 25, pts: 60, label: 'Stor laks',     color: '#cc6644', tailColor: '#aa4422', spots: false }, // huge red
-  ]
-  // Weighted spawn pool — lots of smalls, few bigs
-  const SPAWN_POOL = [0,0,0,0,0,1,1,1,1,2,2,2,3,3,3,3,4,4,5,5,6,7,8]
-
-  function initGame(levelIdx) {
-    const lvl = LEVELS[Math.min(levelIdx, LEVELS.length - 1)]
-    const playerR = 12 + levelIdx * 2.5
+  function buildLevel(lvlIdx, score, lives) {
+    const cfg = LEVELS_CFG[Math.min(lvlIdx, LEVELS_CFG.length - 1)]
+    const playerR = 10 + lvlIdx * 2.5
     const gs = {
-      state: 'playing',
-      level: levelIdx,
-      score: stateRef.current ? stateRef.current.score : 0,
-      lives: stateRef.current ? stateRef.current.lives : 3,
-      playerSize: playerR,
-      player: { x: CANVAS_W / 2, y: CANVAS_H / 2, vx: 0, vy: 0, r: playerR },
-      fish: [],
-      hazards: [],
-      keys: {},
-      eatCount: 0,
-      eatTarget: 8 + levelIdx * 2,
-      flashMsg: '',
-      flashTimer: 0,
-      levelConfig: lvl,
+      phase: 'playing', lvlIdx, score, lives,
+      eaten: 0, target: cfg.eatTarget,
+      player: { x: CW / 2, y: CH / 2, vx: 0, vy: 0, r: playerR, facingLeft: false },
+      fish: [], hazards: [], keys: {}, frame: 0,
+      flash: '', flashT: 0, cfg,
     }
-    // Spawn fish — first 70% are forced small so player can eat them
-    for (let i = 0; i < lvl.fishCount; i++) spawnFishInState(gs, lvl.speed, i < Math.floor(lvl.fishCount * 0.7))
-    // Spawn hazards
-    lvl.hazards.forEach(h => spawnHazard(gs, h, lvl.speed))
+    // Start with full screen of fish — 70% forced small
+    for (let i = 0; i < cfg.fishOnScreen; i++) {
+      gs.fish.push(makeFish(playerR, cfg.speedMult, CW, CH, i < Math.floor(cfg.fishOnScreen * 0.7)))
+    }
+    // Hazards
+    cfg.hazards.forEach(h => gs.hazards.push(makeHazard(h, CW, CH, cfg.speedMult)))
     return gs
   }
 
-  function spawnFishInState(gs, speedMult, forceSmall) {
-    const poolIdx = forceSmall
-      ? SPAWN_POOL[Math.floor(Math.random() * Math.min(12, SPAWN_POOL.length))] // only small fish
-      : SPAWN_POOL[Math.floor(Math.random() * SPAWN_POOL.length)]
-    const def = FISH_DEFS[poolIdx]
-    const fromLeft = Math.random() > 0.5
-    gs.fish.push({
-      ...def,
-      id: Math.random(),
-      x: fromLeft ? -30 : CANVAS_W + 30,
-      y: 50 + Math.random() * (CANVAS_H - 100),
-      vx: (fromLeft ? 1 : -1) * (0.5 + Math.random() * 0.7) * speedMult,
-      vy: (Math.random() - 0.5) * 0.4 * speedMult,
-    })
-  }
-
-  function spawnHazard(gs, type, speedMult) {
-    if (type === 'hook') {
-      gs.hazards.push({ type: 'hook', id: Math.random(), x: 50 + Math.random() * (CANVAS_W - 100), y: -20, vy: 1.2 * speedMult, vx: 0, w: 12, h: 28 })
-    } else if (type === 'net') {
-      gs.hazards.push({ type: 'net', id: Math.random(), x: Math.random() > 0.5 ? -80 : CANVAS_W + 80, y: 60 + Math.random() * (CANVAS_H - 120), vx: (Math.random() > 0.5 ? 1 : -1) * 0.8 * speedMult, vy: 0, w: 60, h: 80 })
-    } else if (type === 'barrel') {
-      gs.hazards.push({ type: 'barrel', id: Math.random(), x: 40 + Math.random() * (CANVAS_W - 80), y: -30, vy: 1.5 * speedMult, vx: (Math.random() - 0.5) * 1.2 * speedMult, r: 18 })
-    }
-  }
-
-  function gameLoop() {
-    const gs = stateRef.current
-    if (!gs || gs.state !== 'playing') return
+  function tick() {
+    const gs = gsRef.current
+    if (!gs || gs.phase !== 'playing') return
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
+    const { cfg } = gs
+    gs.frame++
 
-    // Move player
-    const SPEED = 3.5
-    if (gs.keys['ArrowLeft']  || gs.keys['a']) gs.player.vx = Math.max(gs.player.vx - 0.8, -SPEED)
-    else if (gs.keys['ArrowRight'] || gs.keys['d']) gs.player.vx = Math.min(gs.player.vx + 0.8, SPEED)
-    else gs.player.vx *= 0.85
-    if (gs.keys['ArrowUp']   || gs.keys['w']) gs.player.vy = Math.max(gs.player.vy - 0.8, -SPEED)
-    else if (gs.keys['ArrowDown']  || gs.keys['s']) gs.player.vy = Math.min(gs.player.vy + 0.8, SPEED)
-    else gs.player.vy *= 0.85
+    // ── Player movement ──────────────────────────────────────────────────────
+    const SPD = 3.8
+    const { keys, player: p } = gs
+    if (keys['ArrowLeft']  || keys['a']) { p.vx = Math.max(p.vx - 0.9, -SPD); p.facingLeft = true  }
+    else if (keys['ArrowRight'] || keys['d']) { p.vx = Math.min(p.vx + 0.9,  SPD); p.facingLeft = false }
+    else p.vx *= 0.82
+    if (keys['ArrowUp']    || keys['w']) p.vy = Math.max(p.vy - 0.9, -SPD)
+    else if (keys['ArrowDown']  || keys['s']) p.vy = Math.min(p.vy + 0.9,  SPD)
+    else p.vy *= 0.82
+    p.x = Math.max(p.r, Math.min(CW - p.r, p.x + p.vx))
+    p.y = Math.max(p.r, Math.min(CH - p.r, p.y + p.vy))
 
-    gs.player.x = Math.max(gs.player.r, Math.min(CANVAS_W - gs.player.r, gs.player.x + gs.player.vx))
-    gs.player.y = Math.max(gs.player.r, Math.min(CANVAS_H - gs.player.r, gs.player.y + gs.player.vy))
-
-    // Move fish
-    const lvl = gs.levelConfig
+    // ── Move fish + wrap/respawn when off-screen ──────────────────────────────
     gs.fish.forEach(f => {
       f.x += f.vx; f.y += f.vy
-      if (f.x < -60 || f.x > CANVAS_W + 60) { f.x = f.vx > 0 ? -30 : CANVAS_W + 30; f.y = 40 + Math.random() * (CANVAS_H - 80) }
-      if (f.y < 20 || f.y > CANVAS_H - 20) f.vy *= -1
-    })
-
-    // Move hazards
-    gs.hazards.forEach(h => {
-      if (h.type === 'hook') {
-        h.y += h.vy
-        if (h.y > CANVAS_H + 40) { h.y = -20; h.x = 50 + Math.random() * (CANVAS_W - 100) }
-      } else if (h.type === 'net') {
-        h.x += h.vx
-        if (h.x < -100 || h.x > CANVAS_W + 100) h.vx *= -1
-      } else if (h.type === 'barrel') {
-        h.x += h.vx; h.y += h.vy
-        if (h.x < h.r || h.x > CANVAS_W - h.r) h.vx *= -1
-        if (h.y > CANVAS_H + 40) { h.y = -30; h.x = 40 + Math.random() * (CANVAS_W - 80) }
+      // Bounce vertically
+      if (f.y - f.r < 5)       { f.y = f.r + 5;       f.vy = Math.abs(f.vy) }
+      if (f.y + f.r > CH - 5)  { f.y = CH - f.r - 5;  f.vy = -Math.abs(f.vy) }
+      // If gone off left/right — respawn from opposite side
+      if (f.x < -f.r * 3 || f.x > CW + f.r * 3) {
+        const fromLeft = f.x > CW / 2
+        const type = FISH_TYPES_G[Math.floor(Math.random() * Math.min(5, FISH_TYPES_G.length))]
+        Object.assign(f, type, {
+          x: fromLeft ? -type.r - 5 : CW + type.r + 5,
+          y: type.r + 10 + Math.random() * (CH - type.r * 2 - 20),
+          vx: (fromLeft ? 1 : -1) * (0.6 + Math.random() * 0.5) * cfg.speedMult,
+          vy: (Math.random() - 0.5) * 0.4 * cfg.speedMult,
+          id: Math.random(),
+        })
       }
     })
 
-    // Check fish collisions
+    // ── Maintain fish count — always keep fishOnScreen fish alive ─────────────
+    while (gs.fish.length < cfg.fishOnScreen) {
+      gs.fish.push(makeFish(p.r, cfg.speedMult, CW, CH, gs.fish.length < Math.floor(cfg.fishOnScreen * 0.6)))
+    }
+
+    // ── Move hazards ──────────────────────────────────────────────────────────
+    gs.hazards.forEach(h => {
+      if (h.type === 'hook') {
+        h.y += h.vy
+        if (h.y > CH + 40) { h.y = -30; h.x = 60 + Math.random() * (CW - 120) }
+      } else if (h.type === 'net') {
+        h.x += h.vx
+        if (h.x < -80 || h.x > CW + 80) h.vx *= -1
+      } else {
+        h.x += h.vx; h.y += h.vy
+        if (h.x < h.r || h.x > CW - h.r) h.vx *= -1
+        if (h.y > CH + 40) { h.y = -35; h.x = 40 + Math.random() * (CW - 80) }
+      }
+    })
+
+    // ── Collisions: fish ──────────────────────────────────────────────────────
     gs.fish = gs.fish.filter(f => {
-      const dx = gs.player.x - f.x, dy = gs.player.y - f.y
-      const dist = Math.sqrt(dx*dx + dy*dy)
-      if (dist < gs.player.r + f.r - 4) {
-        if (f.r < gs.player.r) {
-          // Eat it!
-          gs.score += f.pts
-          gs.eatCount++
-          gs.player.r = Math.min(gs.player.r + 0.4, 55)
-          gs.flashMsg = `+${f.pts} ${f.label}!`
-          gs.flashTimer = 40
-          spawnFishInState(gs, lvl.speed, gs.player.r < 20)
-          return false
+      const dx = p.x - f.x, dy = p.y - f.y
+      if (Math.sqrt(dx*dx + dy*dy) < p.r + f.r - 5) {
+        if (f.r < p.r) {
+          gs.score += f.pts; gs.eaten++
+          p.r = Math.min(p.r + 0.5, 52)
+          gs.flash = `+${f.pts} ${f.label}!`; gs.flashT = 45
+          return false // eaten — will be replaced by maintain-fish-count loop above
         } else {
-          // Eaten by bigger fish — lose life
-          gs.lives--
-          gs.flashMsg = gs.lives > 0 ? `💀 Au! ${gs.lives} liv igjen` : '💀 Game over!'
-          gs.flashTimer = 60
-          gs.player.x = CANVAS_W / 2; gs.player.y = CANVAS_H / 2; gs.player.vx = 0; gs.player.vy = 0
-          if (gs.lives <= 0) { endGame(gs); return true }
+          loseLife(gs, '💀 Spist av større fisk!')
         }
       }
       return true
     })
 
-    // Check hazard collisions
-    if (gs.state === 'playing') {
+    // ── Collisions: hazards ───────────────────────────────────────────────────
+    if (gs.phase === 'playing') {
       for (const h of gs.hazards) {
         let hit = false
         if (h.type === 'hook') {
-          if (gs.player.x > h.x - h.w/2 - gs.player.r && gs.player.x < h.x + h.w/2 + gs.player.r && gs.player.y > h.y - gs.player.r && gs.player.y < h.y + h.h + gs.player.r) hit = true
+          hit = p.x > h.x - 8 - p.r && p.x < h.x + 8 + p.r && p.y > h.y - p.r && p.y < h.y + 28 + p.r
         } else if (h.type === 'net') {
-          if (gs.player.x > h.x - gs.player.r && gs.player.x < h.x + h.w + gs.player.r && gs.player.y > h.y - gs.player.r && gs.player.y < h.y + h.h + gs.player.r) hit = true
-        } else if (h.type === 'barrel') {
-          const dx = gs.player.x - h.x, dy = gs.player.y - h.y
-          if (Math.sqrt(dx*dx+dy*dy) < gs.player.r + h.r) hit = true
+          hit = p.x > h.x - p.r && p.x < h.x + h.w + p.r && p.y > h.y - p.r && p.y < h.y + h.h + p.r
+        } else {
+          const dx = p.x - h.x, dy = p.y - h.y
+          hit = Math.sqrt(dx*dx + dy*dy) < p.r + h.r - 2
         }
-        if (hit) {
-          gs.lives--
-          gs.flashMsg = gs.lives > 0 ? `💥 Truffet! ${gs.lives} liv igjen` : '💥 Game over!'
-          gs.flashTimer = 70
-          gs.player.x = CANVAS_W / 2; gs.player.y = CANVAS_H / 2; gs.player.vx = 0; gs.player.vy = 0
-          if (gs.lives <= 0) { endGame(gs); break }
-        }
+        if (hit) { loseLife(gs, '💥 Truffet!'); break }
       }
     }
 
-    // Level up
-    if (gs.state === 'playing' && gs.eatCount >= gs.eatTarget) {
-      const nextLevel = gs.level + 1
-      if (nextLevel >= LEVELS.length) {
-        gs.flashMsg = '🏆 Du vant hele spillet!'
-        gs.flashTimer = 120
-        endGame(gs)
+    // ── Level up ──────────────────────────────────────────────────────────────
+    if (gs.phase === 'playing' && gs.eaten >= gs.target) {
+      const next = gs.lvlIdx + 1
+      if (next >= LEVELS_CFG.length) {
+        gs.phase = 'gameover'
+        gs.flash = '🏆 Du klarte alle levels!'
+        finishGame(gs)
       } else {
-        const saved = { score: gs.score, lives: Math.min(gs.lives + 1, 5) }
-        stateRef.current = { ...initGame(nextLevel), score: saved.score, lives: saved.lives }
-        stateRef.current.flashMsg = `🎉 ${LEVELS[nextLevel].label}! ${LEVELS[nextLevel].desc}`
-        stateRef.current.flashTimer = 90
-        setDisplay(d => ({ ...d, level: nextLevel + 1, score: saved.score, lives: saved.lives }))
-        rafRef.current = requestAnimationFrame(gameLoop)
+        const newGs = buildLevel(next, gs.score, Math.min(gs.lives + 1, 5))
+        newGs.flash = `🎉 Level ${next + 1}! ${LEVELS_CFG[next].desc}`
+        newGs.flashT = 90
+        gsRef.current = newGs
+        setUi(u => ({ ...u, level: next + 1, score: gs.score, lives: Math.min(gs.lives + 1, 5), eaten: 0, target: LEVELS_CFG[next].eatTarget }))
+        rafRef.current = requestAnimationFrame(tick)
         return
       }
     }
 
-    if (gs.flashTimer > 0) gs.flashTimer--
+    if (gs.flashT > 0) gs.flashT--
 
-    // Draw
-    draw(ctx, gs)
+    // ── Draw ──────────────────────────────────────────────────────────────────
+    drawScene(ctx, gs)
 
-    setDisplay(d => ({ ...d, score: gs.score, lives: gs.lives, playerSize: Math.round(gs.player.r), level: gs.level + 1 }))
-    rafRef.current = requestAnimationFrame(gameLoop)
+    setUi(u => ({ ...u, score: gs.score, lives: gs.lives, eaten: gs.eaten, target: gs.target, level: gs.lvlIdx + 1 }))
+    rafRef.current = requestAnimationFrame(tick)
   }
 
-  function endGame(gs) {
-    gs.state = 'gameover'
-    const hs = Math.max(parseInt(localStorage.getItem('tf_hs2') || '0'), gs.score)
-    localStorage.setItem('tf_hs2', String(hs))
-    setDisplay(d => ({ ...d, state: 'gameover', score: gs.score, highScore: hs }))
+  function loseLife(gs, msg) {
+    gs.lives--
+    gs.flash = gs.lives > 0 ? `${msg} ${gs.lives} liv igjen` : `${msg} Game over!`
+    gs.flashT = 70
+    gs.player.x = CW / 2; gs.player.y = CH / 2; gs.player.vx = 0; gs.player.vy = 0
+    if (gs.lives <= 0) { gs.phase = 'gameover'; finishGame(gs) }
+  }
+
+  function finishGame(gs) {
+    const hs = Math.max(parseInt(localStorage.getItem('tf_hs3')||'0'), gs.score)
+    localStorage.setItem('tf_hs3', String(hs))
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    setUi(u => ({ ...u, phase: 'gameover', score: gs.score, highScore: hs, hs }))
   }
 
-  // Helper: draw a fish shape using canvas primitives (crisp, no emoji blur)
-  function drawFish(ctx, x, y, r, color, tailColor, facingLeft, danger, spots) {
-    ctx.save()
-    ctx.translate(x, y)
-    if (facingLeft) ctx.scale(-1, 1)
+  function drawScene(ctx, gs) {
+    const { player: p, fish, hazards, flash, flashT, frame } = gs
 
-    // Body (ellipse)
-    ctx.beginPath()
-    ctx.ellipse(0, 0, r, r * 0.6, 0, 0, Math.PI * 2)
-    ctx.fillStyle = color
-    ctx.fill()
+    // Background
+    const bg = ctx.createLinearGradient(0, 0, 0, CH)
+    bg.addColorStop(0, '#1a4a6e'); bg.addColorStop(0.45, '#2d6a8f'); bg.addColorStop(1, '#0d2235')
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, CW, CH)
 
-    // Tail
-    ctx.beginPath()
-    ctx.moveTo(-r * 0.7, 0)
-    ctx.lineTo(-r * 1.4, -r * 0.55)
-    ctx.lineTo(-r * 1.4, r * 0.55)
-    ctx.closePath()
-    ctx.fillStyle = tailColor
-    ctx.fill()
+    // Shimmer lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1
+    for (let i = 0; i < 7; i++) { const y = 45 + i * 55; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CW,y); ctx.stroke() }
 
-    // Dorsal fin
-    ctx.beginPath()
-    ctx.moveTo(-r * 0.1, -r * 0.6)
-    ctx.lineTo(r * 0.3, -r * 1.0)
-    ctx.lineTo(r * 0.6, -r * 0.6)
-    ctx.closePath()
-    ctx.fillStyle = tailColor
-    ctx.fill()
-
-    // Spots (for trout-style)
-    if (spots) {
-      ctx.fillStyle = 'rgba(0,0,0,0.18)'
-      for (let i = 0; i < 4; i++) {
-        ctx.beginPath()
-        ctx.arc((i - 1.5) * r * 0.35, (i % 2 === 0 ? -1 : 1) * r * 0.15, r * 0.08, 0, Math.PI * 2)
-        ctx.fill()
-      }
+    // Bubbles
+    ctx.fillStyle = 'rgba(255,255,255,0.1)'
+    for (let i = 0; i < 14; i++) {
+      const bx = (i * 173 + 30) % CW
+      const by = ((i * 97 + frame * (0.3 + i * 0.04)) % CH)
+      ctx.beginPath(); ctx.arc(bx, by, 1.2 + (i%3)*0.6, 0, Math.PI*2); ctx.fill()
     }
 
-    // Eye
-    ctx.beginPath()
-    ctx.arc(r * 0.45, -r * 0.1, Math.max(1.5, r * 0.13), 0, Math.PI * 2)
-    ctx.fillStyle = '#fff'
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(r * 0.48, -r * 0.1, Math.max(0.8, r * 0.07), 0, Math.PI * 2)
-    ctx.fillStyle = '#111'
-    ctx.fill()
+    // Draw fish
+    fish.forEach(f => drawFishShape(ctx, f.x, f.y, f.r, f.color, f.tail, f.vx < 0, f.spots, f.r >= p.r))
 
-    // Danger indicator: dashed red outline only — NO filled bubble
-    if (danger) {
-      ctx.setLineDash([3, 3])
-      ctx.strokeStyle = 'rgba(255, 80, 80, 0.75)'
-      ctx.lineWidth = 1.5
-      ctx.beginPath()
-      ctx.ellipse(0, 0, r + 3, r * 0.6 + 3, 0, 0, Math.PI * 2)
-      ctx.stroke()
-      ctx.setLineDash([])
-    }
-    ctx.restore()
-  }
-
-  function draw(ctx, gs) {
-    // Background gradient
-    const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H)
-    grad.addColorStop(0, '#1a4a6e')
-    grad.addColorStop(0.4, '#2d6a8f')
-    grad.addColorStop(1, '#0f2a40')
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-
-    // Water shimmer lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)'
-    ctx.lineWidth = 1
-    for (let i = 0; i < 7; i++) {
-      const y = 50 + i * 56
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke()
-    }
-
-    // Animated bubbles (use frame counter from gs)
-    gs.frame = (gs.frame || 0) + 1
-    ctx.fillStyle = 'rgba(255,255,255,0.12)'
-    for (let i = 0; i < 10; i++) {
-      const bx = (i * 179 + 40) % CANVAS_W
-      const by = ((i * 113 + gs.frame * 0.3 * (0.5 + i * 0.1)) % CANVAS_H)
-      ctx.beginPath(); ctx.arc(bx, by, 1.5 + (i % 3) * 0.7, 0, Math.PI * 2); ctx.fill()
-    }
-
-    // Draw all fish as canvas shapes
-    gs.fish.forEach(f => {
-      const danger = f.r >= gs.player.r
-      drawFish(ctx, f.x, f.y, f.r, f.color, f.tailColor, f.vx < 0, danger, f.spots)
-    })
-
-    // Hazards — drawn as clean canvas shapes
-    gs.hazards.forEach(h => {
+    // Draw hazards
+    hazards.forEach(h => {
       ctx.save()
       if (h.type === 'hook') {
-        // Fishing line from top
-        ctx.strokeStyle = 'rgba(220,220,200,0.6)'; ctx.lineWidth = 1.5
+        // Fishing line
+        ctx.strokeStyle = 'rgba(220,220,180,0.5)'; ctx.lineWidth = 1.5
         ctx.beginPath(); ctx.moveTo(h.x, 0); ctx.lineTo(h.x, h.y); ctx.stroke()
-        // Hook shape
-        ctx.strokeStyle = '#c0c0a0'; ctx.lineWidth = 3; ctx.lineCap = 'round'
-        ctx.beginPath()
-        ctx.moveTo(h.x, h.y)
-        ctx.lineTo(h.x, h.y + 18)
-        ctx.arc(h.x - 7, h.y + 18, 7, 0, Math.PI * 0.9, false)
+        // Hook body
+        ctx.strokeStyle = '#c8c890'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+        ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(h.x, h.y + 18)
+        ctx.arc(h.x - 7, h.y + 18, 7, 0, Math.PI * 0.95, false)
         ctx.stroke()
         // Shine
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1
         ctx.beginPath(); ctx.moveTo(h.x - 1, h.y + 2); ctx.lineTo(h.x - 1, h.y + 10); ctx.stroke()
       } else if (h.type === 'net') {
-        // Net as grid of lines
-        ctx.strokeStyle = '#c8922a'; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.6
-        for (let nx = 0; nx <= h.w; nx += 10) {
-          ctx.beginPath(); ctx.moveTo(h.x + nx, h.y); ctx.lineTo(h.x + nx, h.y + h.h); ctx.stroke()
-        }
-        for (let ny = 0; ny <= h.h; ny += 10) {
-          ctx.beginPath(); ctx.moveTo(h.x, h.y + ny); ctx.lineTo(h.x + h.w, h.y + ny); ctx.stroke()
-        }
+        ctx.strokeStyle = '#c8922a'; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.55
+        for (let nx = 0; nx <= h.w; nx += 10) { ctx.beginPath(); ctx.moveTo(h.x+nx,h.y); ctx.lineTo(h.x+nx,h.y+h.h); ctx.stroke() }
+        for (let ny = 0; ny <= h.h; ny += 10) { ctx.beginPath(); ctx.moveTo(h.x,h.y+ny); ctx.lineTo(h.x+h.w,h.y+ny); ctx.stroke() }
         ctx.globalAlpha = 1
-        // Corner floats
         ctx.fillStyle = '#e88020'
-        ;[[h.x, h.y],[h.x+h.w, h.y],[h.x, h.y+h.h],[h.x+h.w, h.y+h.h]].forEach(([fx,fy]) => {
-          ctx.beginPath(); ctx.arc(fx, fy, 4, 0, Math.PI*2); ctx.fill()
+        ;[[h.x,h.y],[h.x+h.w,h.y],[h.x,h.y+h.h],[h.x+h.w,h.y+h.h]].forEach(([fx,fy]) => {
+          ctx.beginPath(); ctx.arc(fx,fy,4,0,Math.PI*2); ctx.fill()
         })
-      } else if (h.type === 'barrel') {
-        // Barrel as rounded rect with stripes
-        ctx.fillStyle = '#8B4513'
-        ctx.beginPath(); ctx.roundRect(h.x - h.r, h.y - h.r, h.r*2, h.r*2, 4); ctx.fill()
-        ctx.strokeStyle = '#5a2d0c'; ctx.lineWidth = 2
-        ctx.beginPath(); ctx.roundRect(h.x - h.r, h.y - h.r, h.r*2, h.r*2, 4); ctx.stroke()
-        // Metal bands
-        ctx.strokeStyle = '#aaa'; ctx.lineWidth = 2
-        ;[-0.3, 0.3].forEach(offset => {
-          ctx.beginPath()
-          ctx.moveTo(h.x - h.r, h.y + h.r * offset)
-          ctx.lineTo(h.x + h.r, h.y + h.r * offset)
-          ctx.stroke()
-        })
-        // Skull
-        ctx.fillStyle = '#ff4444'; ctx.font = `bold ${h.r}px sans-serif`
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-        ctx.fillText('☠', h.x, h.y)
+      } else {
+        // Barrel
+        ctx.fillStyle = '#7a3010'
+        if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(h.x-h.r, h.y-h.r, h.r*2, h.r*2, 5); ctx.fill() }
+        else { ctx.fillRect(h.x-h.r, h.y-h.r, h.r*2, h.r*2) }
+        ctx.strokeStyle = '#4a1a00'; ctx.lineWidth = 2
+        if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(h.x-h.r, h.y-h.r, h.r*2, h.r*2, 5); ctx.stroke() }
+        ctx.strokeStyle = '#bbb'; ctx.lineWidth = 2
+        ctx.beginPath(); ctx.moveTo(h.x-h.r+2, h.y - h.r*0.3); ctx.lineTo(h.x+h.r-2, h.y - h.r*0.3); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(h.x-h.r+2, h.y + h.r*0.3); ctx.lineTo(h.x+h.r-2, h.y + h.r*0.3); ctx.stroke()
+        ctx.fillStyle = '#ff5555'; ctx.font = `bold ${h.r}px sans-serif`
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('☠', h.x, h.y)
       }
       ctx.restore()
     })
 
-    // Player fish — drawn in bright cyan/white to stand out
-    drawFish(ctx, gs.player.x, gs.player.y, gs.player.r, '#00e5ff', '#00b8d9', gs.player.vx < 0, false, false)
-    // Glow ring around player
-    ctx.strokeStyle = 'rgba(0,229,255,0.35)'; ctx.lineWidth = 2
-    ctx.beginPath(); ctx.arc(gs.player.x, gs.player.y, gs.player.r + 5, 0, Math.PI*2); ctx.stroke()
-
-    // Flash message
-    if (gs.flashTimer > 0) {
-      ctx.save()
-      ctx.globalAlpha = Math.min(1, gs.flashTimer / 20)
-      ctx.fillStyle = gs.flashMsg.includes('💀') || gs.flashMsg.includes('💥') ? '#ff6b6b' : '#f0d070'
-      ctx.font = 'bold 20px Inter, sans-serif'
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText(gs.flashMsg, CANVAS_W/2, CANVAS_H/2 - 60)
-      ctx.restore()
-    }
+    // Player
+    drawFishShape(ctx, p.x, p.y, p.r, '#00e5ff', '#00b8cc', p.facingLeft, false, false)
+    ctx.strokeStyle = 'rgba(0,229,255,0.3)'; ctx.lineWidth = 2.5
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 5, 0, Math.PI*2); ctx.stroke()
 
     // Progress bar
-    const prog = Math.min(gs.eatCount / gs.eatTarget, 1)
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'
-    ctx.fillRect(10, 10, 160, 10)
-    ctx.fillStyle = '#c8922a'
-    ctx.fillRect(10, 10, 160 * prog, 10)
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1
-    ctx.strokeRect(10, 10, 160, 10)
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '10px Inter, sans-serif'
+    const prog = Math.min(gs.eaten / gs.target, 1)
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(10, 10, 170, 12)
+    ctx.fillStyle = '#c8922a'; ctx.fillRect(10, 10, 170 * prog, 12)
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.strokeRect(10, 10, 170, 12)
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = '11px Inter,sans-serif'
     ctx.textAlign = 'left'; ctx.textBaseline = 'top'
-    ctx.fillText(`Spist: ${gs.eatCount}/${gs.eatTarget}`, 12, 24)
+    ctx.fillText(`Spist: ${gs.eaten}/${gs.target}`, 12, 26)
+
+    // Flash message
+    if (flashT > 0) {
+      const alpha = Math.min(1, flashT / 15)
+      ctx.save(); ctx.globalAlpha = alpha
+      const isGood = !flash.includes('💀') && !flash.includes('💥')
+      ctx.fillStyle = isGood ? '#ffe066' : '#ff7070'
+      ctx.font = 'bold 19px Inter,sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      // Text shadow
+      ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 6
+      ctx.fillText(flash, CW/2, CH/2 - 70)
+      ctx.restore()
+    }
   }
 
   function startGame() {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    stateRef.current = initGame(0)
-    stateRef.current.score = 0
-    stateRef.current.lives = 3
-    setDisplay(d => ({ ...d, state: 'playing', score: 0, level: 1, lives: 3 }))
-    rafRef.current = requestAnimationFrame(gameLoop)
+    gsRef.current = buildLevel(0, 0, 3)
+    setUi(u => ({ ...u, phase: 'playing', score: 0, level: 1, lives: 3, eaten: 0, target: LEVELS_CFG[0].eatTarget }))
+    rafRef.current = requestAnimationFrame(tick)
   }
 
   useEffect(() => {
-    const onKey = (e) => {
-      if (!stateRef.current) return
+    const down = (e) => {
       if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault()
-      stateRef.current.keys[e.key] = e.type === 'keydown'
+      if (gsRef.current) gsRef.current.keys[e.key] = true
     }
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('keyup', onKey)
+    const up = (e) => { if (gsRef.current) gsRef.current.keys[e.key] = false }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
     return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('keyup', onKey)
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
   }, [])
 
-  // Touch/mobile controls
-  const handleTouch = (dir) => {
-    if (!stateRef.current) return
-    Object.keys(stateRef.current.keys).forEach(k => { stateRef.current.keys[k] = false })
-    if (dir) stateRef.current.keys[dir] = true
-  }
-  const stopTouch = () => { if (stateRef.current) stateRef.current.keys = {} }
-
-  const hs = display.highScore
+  const holdKey = (key) => { if (gsRef.current) gsRef.current.keys[key] = true }
+  const releaseKey = (key) => { if (gsRef.current) gsRef.current.keys[key] = false }
 
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
         <div><p className="tf-label">Klubbens arkadeseksjon</p><h2 className="tf-title">🎮 Fiskespill</h2></div>
-        <span style={{ fontSize: 13, color: CO.muted }}>🏆 Rekord: <b style={{ color: CO.gold }}>{hs}</b></span>
+        <span style={{ fontSize: 13, color: CO.muted }}>🏆 Rekord: <b style={{ color: CO.gold }}>{ui.hs}</b></span>
       </div>
 
-      {display.state === 'idle' && (
+      {ui.phase === 'idle' && (
         <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🐟</div>
+          <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🐟</div>
           <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.forest, marginBottom: '.75rem' }}>Feeding Frenzy</h3>
-          <p style={{ color: CO.muted, maxWidth: 420, margin: '0 auto 1rem', fontSize: 14, lineHeight: 1.6 }}>
-            Styr fisken din med <b>piltastene</b> (eller WASD). Spis fisker som er <b>mindre</b> enn deg og voks! Spiser du en større fisk — mister du et liv. Pass deg for sluk 🪝, garn 🕸 og gifttønner ☠️
+          <p style={{ color: CO.muted, maxWidth: 440, margin: '0 auto 1rem', fontSize: 14, lineHeight: 1.65 }}>
+            Styr den <b style={{color:CO.river}}>blå fisken</b> med <b>piltastene</b> eller <b>WASD</b>.<br/>
+            Spis fisker som er <b>mindre</b> enn deg — du vokser!<br/>
+            <span style={{color:'#c0392b'}}>Farlige fisker har rød stiplet kant.</span> Unngå sluk 🪝, garn og tønner ☠️
           </p>
-          <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-            {LEVELS.map((l, i) => <span key={i} style={{ fontSize: 12, background: CO.creamDk, padding: '3px 10px', borderRadius: 20, color: CO.muted }}>{l.label}: {l.desc}</span>)}
+          <div style={{ display: 'flex', gap: '.4rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+            {LEVELS_CFG.map((l, i) => <span key={i} style={{ fontSize: 11, background: CO.creamDk, padding: '3px 10px', borderRadius: 20, color: CO.muted }}>L{l.num}: {l.desc}</span>)}
           </div>
           <TFBtn variant="primary" onClick={startGame} style={{ fontSize: 16, padding: '12px 32px' }}>▶ Start spillet</TFBtn>
         </div>
       )}
 
-      {(display.state === 'playing' || display.state === 'gameover') && (
+      {(ui.phase === 'playing' || ui.phase === 'gameover') && (
         <>
-          {/* HUD */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-            <span style={{ fontWeight: 700, color: CO.forest, fontSize: 14 }}>Level {display.level} / {LEVELS.length}</span>
-            <span style={{ fontSize: 14, color: CO.forest }}>Score: <b style={{ color: CO.gold }}>{display.score}</b></span>
-            <span style={{ fontSize: 20 }}>{'❤️'.repeat(display.lives)}{'🖤'.repeat(Math.max(0, 3 - display.lives))}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 700, color: CO.forest, fontSize: 14 }}>Level {ui.level} / {LEVELS_CFG.length}</span>
+            <span style={{ fontSize: 14, color: CO.forest }}>Score: <b style={{ color: CO.gold }}>{ui.score}</b></span>
+            <span style={{ fontSize: 22, letterSpacing: 2 }}>{'❤️'.repeat(Math.max(0,ui.lives))}{'🖤'.repeat(Math.max(0,3-ui.lives))}</span>
           </div>
 
-          {/* Canvas */}
-          <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
-            style={{ width: '100%', borderRadius: 12, display: 'block', maxHeight: 500 }} />
+          <canvas ref={canvasRef} width={CW} height={CH} style={{ width: '100%', borderRadius: 12, display: 'block' }} />
 
-          {/* Mobile controls */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 10, maxWidth: 200, margin: '10px auto 0' }}>
-            {[['', '⬆️', 'ArrowUp'], ['⬅️', '', 'ArrowLeft'], ['', '⬇️', 'ArrowDown'], ['➡️', '', 'ArrowRight']].map(([a, b, dir], i) => (
-              <button key={i} onTouchStart={() => handleTouch(dir)} onTouchEnd={stopTouch} onMouseDown={() => handleTouch(dir)} onMouseUp={stopTouch}
-                style={{ padding: '10px', fontSize: '1.2rem', borderRadius: 8, border: `1px solid ${CO.creamDk}`, background: CO.white, cursor: 'pointer', visibility: (a || b) ? 'visible' : 'hidden' }}>
-                {a || b}
+          {/* Mobile d-pad */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, maxWidth: 180, margin: '10px auto 0' }}>
+            {[
+              [null,  'ArrowUp',    '↑', 0, 1],
+              ['ArrowLeft', null,   '←', 1, 0],
+              [null,  'ArrowDown',  '↓', 1, 2],  // skips middle
+              ['ArrowRight', null,  '→', 1, 2],
+            ].map(([, key, label], i) => (
+              <button key={i} onPointerDown={() => holdKey(key)} onPointerUp={() => releaseKey(key)} onPointerLeave={() => releaseKey(key)}
+                style={{ padding: '12px', fontSize: '1.1rem', borderRadius: 8, border: `1px solid ${CO.creamDk}`, background: CO.white, cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }}>
+                {label}
               </button>
             ))}
           </div>
-          <p style={{ textAlign: 'center', fontSize: 11, color: CO.muted, marginTop: 4 }}>Piltaster / WASD på PC · Knapper på mobil</p>
+          <p style={{ textAlign: 'center', fontSize: 11, color: CO.muted, marginTop: 4 }}>Piltaster / WASD · Knapper på mobil</p>
 
-          {display.state === 'gameover' && (
+          {ui.phase === 'gameover' && (
             <div style={{ textAlign: 'center', marginTop: '1.5rem', background: CO.forest, borderRadius: 12, padding: '2rem' }}>
               <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.gold, marginBottom: '.5rem' }}>Game Over!</p>
-              <p style={{ fontSize: '2rem', fontWeight: 700, color: CO.cream, marginBottom: '.25rem' }}>{display.score} poeng</p>
-              {display.score >= hs && display.score > 0 && <p style={{ color: CO.gold, fontSize: 14, marginBottom: '1rem' }}>🏆 Ny personrekord!</p>}
-              {display.score < hs && <p style={{ color: CO.mist, fontSize: 13, marginBottom: '1rem', opacity: .7 }}>Rekord: {hs} poeng</p>}
+              <p style={{ fontSize: '2rem', fontWeight: 700, color: CO.cream, marginBottom: '.25rem' }}>{ui.score} poeng</p>
+              {ui.score > 0 && ui.score >= (ui.hs || 0) && <p style={{ color: CO.gold, fontSize: 14, marginBottom: '1rem' }}>🏆 Ny personrekord!</p>}
               <TFBtn variant="primary" onClick={startGame} style={{ fontSize: 15, padding: '10px 28px' }}>▶ Spill igjen</TFBtn>
             </div>
           )}
