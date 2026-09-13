@@ -242,7 +242,7 @@ function LoginScreen({ onLogin }) {
           </div>
         ))}
         {error && <p style={{ color: '#e07070', fontSize: 13, marginBottom: 8 }}>Feil brukernavn eller passord.</p>}
-        <button onClick={attempt} style={{ width: '100%', background: CO.gold, color: CO.deep, border: 'none', borderRadius: 6, padding: '10px 13px', fontWeight: 700, fontSize: 15, marginTop: 8, fontFamily: 'inherit', cursor: 'pointer' }}>Logg inn</button>
+        <button onClick={attempt} style={{ width: '100%', background: CO.gold, color: CO.deep, border: '1px solid transparent', borderRadius: 6, padding: '9px 13px', fontWeight: 700, fontSize: 15, marginTop: 6, fontFamily: 'inherit', cursor: 'pointer', display: 'block', boxSizing: 'border-box' }}>Logg inn</button>
         <p style={{ marginTop: '1.25rem', fontSize: 12, color: 'rgba(245,240,232,.35)', borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: '1rem' }}>Kontakt styret for innloggingsinfo</p>
       </div>
     </div>
@@ -823,15 +823,21 @@ function FishingGame() {
     { label: 'Level 8', fishCount: 18, hazards: ['hook','net','barrel'], speed: 3.0, desc: 'Maksimal kaos!' },
   ]
 
-  // Fish type definitions: [emoji, baseSize (px radius), points, label]
+  // Fish type definitions — weighted toward small fish so player can actually level up
+  // color = body color, tailColor = tail, spots = decorative dots
   const FISH_DEFS = [
-    { emoji: '🐟', r: 10, pts: 5,   label: 'Småfisk' },
-    { emoji: '🐠', r: 14, pts: 10,  label: 'Regnbueørret' },
-    { emoji: '🐡', r: 18, pts: 15,  label: 'Abbor' },
-    { emoji: '🎣', r: 22, pts: 25,  label: 'Ørret' },
-    { emoji: '🦈', r: 30, pts: 50,  label: 'Hai' },
-    { emoji: '🐙', r: 26, pts: 40,  label: 'Gjedde' },
+    { r: 7,  pts: 3,  label: 'Småfisk',       color: '#7ec8e3', tailColor: '#5ab0cc', spots: false }, // tiny blue
+    { r: 8,  pts: 4,  label: 'Morderfisk',    color: '#a8d8a8', tailColor: '#78b878', spots: false }, // tiny green
+    { r: 9,  pts: 5,  label: 'Liten ørret',   color: '#f4a460', tailColor: '#d2865a', spots: true  }, // small orange
+    { r: 7,  pts: 3,  label: 'Sildefisk',     color: '#c0d8f0', tailColor: '#90b8e0', spots: false }, // tiny silver
+    { r: 11, pts: 8,  label: 'Regnbueørret',  color: '#ff9eb5', tailColor: '#e07090', spots: true  }, // medium pink
+    { r: 13, pts: 12, label: 'Abbor',         color: '#90ee90', tailColor: '#55aa55', spots: true  }, // medium green
+    { r: 16, pts: 20, label: 'Ørret',         color: '#e8a030', tailColor: '#c07020', spots: true  }, // large orange
+    { r: 20, pts: 35, label: 'Gjedde',        color: '#708060', tailColor: '#506040', spots: false }, // large grey-green
+    { r: 25, pts: 60, label: 'Stor laks',     color: '#cc6644', tailColor: '#aa4422', spots: false }, // huge red
   ]
+  // Weighted spawn pool — lots of smalls, few bigs
+  const SPAWN_POOL = [0,0,0,0,0,1,1,1,1,2,2,2,3,3,3,3,4,4,5,5,6,7,8]
 
   function initGame(levelIdx) {
     const lvl = LEVELS[Math.min(levelIdx, LEVELS.length - 1)]
@@ -852,23 +858,26 @@ function FishingGame() {
       flashTimer: 0,
       levelConfig: lvl,
     }
-    // Spawn fish
-    for (let i = 0; i < lvl.fishCount; i++) spawnFishInState(gs, lvl.speed)
+    // Spawn fish — first 70% are forced small so player can eat them
+    for (let i = 0; i < lvl.fishCount; i++) spawnFishInState(gs, lvl.speed, i < Math.floor(lvl.fishCount * 0.7))
     // Spawn hazards
     lvl.hazards.forEach(h => spawnHazard(gs, h, lvl.speed))
     return gs
   }
 
-  function spawnFishInState(gs, speedMult) {
-    const def = FISH_DEFS[Math.floor(Math.random() * FISH_DEFS.length)]
+  function spawnFishInState(gs, speedMult, forceSmall) {
+    const poolIdx = forceSmall
+      ? SPAWN_POOL[Math.floor(Math.random() * Math.min(12, SPAWN_POOL.length))] // only small fish
+      : SPAWN_POOL[Math.floor(Math.random() * SPAWN_POOL.length)]
+    const def = FISH_DEFS[poolIdx]
     const fromLeft = Math.random() > 0.5
     gs.fish.push({
       ...def,
       id: Math.random(),
       x: fromLeft ? -30 : CANVAS_W + 30,
-      y: 40 + Math.random() * (CANVAS_H - 80),
-      vx: (fromLeft ? 1 : -1) * (0.6 + Math.random() * 0.6) * speedMult,
-      vy: (Math.random() - 0.5) * 0.5 * speedMult,
+      y: 50 + Math.random() * (CANVAS_H - 100),
+      vx: (fromLeft ? 1 : -1) * (0.5 + Math.random() * 0.7) * speedMult,
+      vy: (Math.random() - 0.5) * 0.4 * speedMult,
     })
   }
 
@@ -936,7 +945,7 @@ function FishingGame() {
           gs.player.r = Math.min(gs.player.r + 0.4, 55)
           gs.flashMsg = `+${f.pts} ${f.label}!`
           gs.flashTimer = 40
-          spawnFishInState(gs, lvl.speed)
+          spawnFishInState(gs, lvl.speed, gs.player.r < 20)
           return false
         } else {
           // Eaten by bigger fish — lose life
@@ -1007,91 +1016,160 @@ function FishingGame() {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
   }
 
+  // Helper: draw a fish shape using canvas primitives (crisp, no emoji blur)
+  function drawFish(ctx, x, y, r, color, tailColor, facingLeft, danger, spots) {
+    ctx.save()
+    ctx.translate(x, y)
+    if (facingLeft) ctx.scale(-1, 1)
+
+    // Body (ellipse)
+    ctx.beginPath()
+    ctx.ellipse(0, 0, r, r * 0.6, 0, 0, Math.PI * 2)
+    ctx.fillStyle = color
+    ctx.fill()
+
+    // Tail
+    ctx.beginPath()
+    ctx.moveTo(-r * 0.7, 0)
+    ctx.lineTo(-r * 1.4, -r * 0.55)
+    ctx.lineTo(-r * 1.4, r * 0.55)
+    ctx.closePath()
+    ctx.fillStyle = tailColor
+    ctx.fill()
+
+    // Dorsal fin
+    ctx.beginPath()
+    ctx.moveTo(-r * 0.1, -r * 0.6)
+    ctx.lineTo(r * 0.3, -r * 1.0)
+    ctx.lineTo(r * 0.6, -r * 0.6)
+    ctx.closePath()
+    ctx.fillStyle = tailColor
+    ctx.fill()
+
+    // Spots (for trout-style)
+    if (spots) {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath()
+        ctx.arc((i - 1.5) * r * 0.35, (i % 2 === 0 ? -1 : 1) * r * 0.15, r * 0.08, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
+    // Eye
+    ctx.beginPath()
+    ctx.arc(r * 0.45, -r * 0.1, Math.max(1.5, r * 0.13), 0, Math.PI * 2)
+    ctx.fillStyle = '#fff'
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(r * 0.48, -r * 0.1, Math.max(0.8, r * 0.07), 0, Math.PI * 2)
+    ctx.fillStyle = '#111'
+    ctx.fill()
+
+    // Danger indicator: dashed red outline only — NO filled bubble
+    if (danger) {
+      ctx.setLineDash([3, 3])
+      ctx.strokeStyle = 'rgba(255, 80, 80, 0.75)'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.ellipse(0, 0, r + 3, r * 0.6 + 3, 0, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+    ctx.restore()
+  }
+
   function draw(ctx, gs) {
     // Background gradient
     const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H)
     grad.addColorStop(0, '#1a4a6e')
-    grad.addColorStop(0.5, '#2d6a8f')
+    grad.addColorStop(0.4, '#2d6a8f')
     grad.addColorStop(1, '#0f2a40')
     ctx.fillStyle = grad
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
 
     // Water shimmer lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)'
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'
     ctx.lineWidth = 1
-    for (let i = 0; i < 6; i++) {
-      ctx.beginPath()
-      const y = 60 + i * 60
-      ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y)
-      ctx.stroke()
+    for (let i = 0; i < 7; i++) {
+      const y = 50 + i * 56
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke()
     }
 
-    // Bubbles effect (static)
-    ctx.fillStyle = 'rgba(255,255,255,0.08)'
-    for (let i = 0; i < 12; i++) {
-      const bx = (i * 137 + 30) % CANVAS_W
-      const by = (i * 89 + 20) % CANVAS_H
-      ctx.beginPath(); ctx.arc(bx, by, 2 + (i % 3), 0, Math.PI*2); ctx.fill()
+    // Animated bubbles (use frame counter from gs)
+    gs.frame = (gs.frame || 0) + 1
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'
+    for (let i = 0; i < 10; i++) {
+      const bx = (i * 179 + 40) % CANVAS_W
+      const by = ((i * 113 + gs.frame * 0.3 * (0.5 + i * 0.1)) % CANVAS_H)
+      ctx.beginPath(); ctx.arc(bx, by, 1.5 + (i % 3) * 0.7, 0, Math.PI * 2); ctx.fill()
     }
 
-    // Fish
-    ctx.font = '20px serif'
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    // Draw all fish as canvas shapes
     gs.fish.forEach(f => {
-      ctx.save()
-      ctx.translate(f.x, f.y)
-      if (f.vx < 0) ctx.scale(-1, 1)
-      const fontSize = Math.round(f.r * 1.6)
-      ctx.font = `${fontSize}px serif`
-      // Dim fish bigger than player (danger)
-      ctx.globalAlpha = f.r >= gs.player.r ? 1.0 : 0.9
-      ctx.fillText(f.emoji, 0, 0)
-      // Red glow on dangerous fish
-      if (f.r >= gs.player.r) {
-        ctx.globalAlpha = 0.25
-        ctx.fillStyle = '#ff4444'
-        ctx.beginPath(); ctx.arc(0, 0, f.r, 0, Math.PI*2); ctx.fill()
-      }
-      ctx.restore()
+      const danger = f.r >= gs.player.r
+      drawFish(ctx, f.x, f.y, f.r, f.color, f.tailColor, f.vx < 0, danger, f.spots)
     })
 
-    // Hazards
+    // Hazards — drawn as clean canvas shapes
     gs.hazards.forEach(h => {
       ctx.save()
       if (h.type === 'hook') {
-        ctx.font = '24px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-        ctx.fillText('🪝', h.x, h.y + h.h/2)
-        // Fishing line
-        ctx.strokeStyle = 'rgba(200,200,200,0.5)'; ctx.lineWidth = 1.5
+        // Fishing line from top
+        ctx.strokeStyle = 'rgba(220,220,200,0.6)'; ctx.lineWidth = 1.5
         ctx.beginPath(); ctx.moveTo(h.x, 0); ctx.lineTo(h.x, h.y); ctx.stroke()
+        // Hook shape
+        ctx.strokeStyle = '#c0c0a0'; ctx.lineWidth = 3; ctx.lineCap = 'round'
+        ctx.beginPath()
+        ctx.moveTo(h.x, h.y)
+        ctx.lineTo(h.x, h.y + 18)
+        ctx.arc(h.x - 7, h.y + 18, 7, 0, Math.PI * 0.9, false)
+        ctx.stroke()
+        // Shine
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1
+        ctx.beginPath(); ctx.moveTo(h.x - 1, h.y + 2); ctx.lineTo(h.x - 1, h.y + 10); ctx.stroke()
       } else if (h.type === 'net') {
-        ctx.globalAlpha = 0.55
-        ctx.fillStyle = '#8B6914'
-        ctx.fillRect(h.x, h.y, h.w, h.h)
-        ctx.strokeStyle = '#c8922a'; ctx.lineWidth = 1.5
-        // Net grid
-        for (let nx = 0; nx <= h.w; nx += 12) { ctx.beginPath(); ctx.moveTo(h.x+nx, h.y); ctx.lineTo(h.x+nx, h.y+h.h); ctx.stroke() }
-        for (let ny = 0; ny <= h.h; ny += 12) { ctx.beginPath(); ctx.moveTo(h.x, h.y+ny); ctx.lineTo(h.x+h.w, h.y+ny); ctx.stroke() }
+        // Net as grid of lines
+        ctx.strokeStyle = '#c8922a'; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.6
+        for (let nx = 0; nx <= h.w; nx += 10) {
+          ctx.beginPath(); ctx.moveTo(h.x + nx, h.y); ctx.lineTo(h.x + nx, h.y + h.h); ctx.stroke()
+        }
+        for (let ny = 0; ny <= h.h; ny += 10) {
+          ctx.beginPath(); ctx.moveTo(h.x, h.y + ny); ctx.lineTo(h.x + h.w, h.y + ny); ctx.stroke()
+        }
         ctx.globalAlpha = 1
+        // Corner floats
+        ctx.fillStyle = '#e88020'
+        ;[[h.x, h.y],[h.x+h.w, h.y],[h.x, h.y+h.h],[h.x+h.w, h.y+h.h]].forEach(([fx,fy]) => {
+          ctx.beginPath(); ctx.arc(fx, fy, 4, 0, Math.PI*2); ctx.fill()
+        })
       } else if (h.type === 'barrel') {
-        ctx.font = `${h.r*2}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-        ctx.fillText('🛢️', h.x, h.y)
+        // Barrel as rounded rect with stripes
+        ctx.fillStyle = '#8B4513'
+        ctx.beginPath(); ctx.roundRect(h.x - h.r, h.y - h.r, h.r*2, h.r*2, 4); ctx.fill()
+        ctx.strokeStyle = '#5a2d0c'; ctx.lineWidth = 2
+        ctx.beginPath(); ctx.roundRect(h.x - h.r, h.y - h.r, h.r*2, h.r*2, 4); ctx.stroke()
+        // Metal bands
+        ctx.strokeStyle = '#aaa'; ctx.lineWidth = 2
+        ;[-0.3, 0.3].forEach(offset => {
+          ctx.beginPath()
+          ctx.moveTo(h.x - h.r, h.y + h.r * offset)
+          ctx.lineTo(h.x + h.r, h.y + h.r * offset)
+          ctx.stroke()
+        })
+        // Skull
+        ctx.fillStyle = '#ff4444'; ctx.font = `bold ${h.r}px sans-serif`
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillText('☠', h.x, h.y)
       }
       ctx.restore()
     })
 
-    // Player fish
-    ctx.save()
-    ctx.translate(gs.player.x, gs.player.y)
-    if (gs.player.vx < 0) ctx.scale(-1, 1)
-    const pSize = Math.round(gs.player.r * 1.8)
-    ctx.font = `${pSize}px serif`
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('🐟', 0, 0)
-    // Glow ring
-    ctx.strokeStyle = 'rgba(200,230,255,0.4)'; ctx.lineWidth = 2
-    ctx.beginPath(); ctx.arc(0, 0, gs.player.r + 3, 0, Math.PI*2); ctx.stroke()
-    ctx.restore()
+    // Player fish — drawn in bright cyan/white to stand out
+    drawFish(ctx, gs.player.x, gs.player.y, gs.player.r, '#00e5ff', '#00b8d9', gs.player.vx < 0, false, false)
+    // Glow ring around player
+    ctx.strokeStyle = 'rgba(0,229,255,0.35)'; ctx.lineWidth = 2
+    ctx.beginPath(); ctx.arc(gs.player.x, gs.player.y, gs.player.r + 5, 0, Math.PI*2); ctx.stroke()
 
     // Flash message
     if (gs.flashTimer > 0) {
