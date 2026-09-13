@@ -625,7 +625,7 @@ function MerchPage({ merch, setMerch, showToast }) {
       </div>
       {merch.length === 0 && <div style={{ textAlign: 'center', padding: '4rem 2rem', color: CO.muted }}>
         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🧢</div>
-        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.2rem', color: CO.forest, marginBottom: '.5rem' }}>Ingen produkter ennå</div>
+        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.2rem', color: CO.forest, marginBottom: '.5rem' }}>Ingen produkter ennå</p>
         <p style={{ fontSize: 14 }}>Klikk «+ Nytt produkt» for å legge til caps, jakker, fluebokser og annet.</p>
       </div>}
       <div className="tf-grid">
