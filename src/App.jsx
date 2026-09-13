@@ -235,14 +235,20 @@ function LoginScreen({ onLogin }) {
         </svg>
         <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.cream, marginBottom: '.2rem' }}>Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua</h1>
         <p style={{ fontStyle: 'italic', color: CO.mist, marginBottom: '1.75rem', opacity: .8, fontSize: 14 }}>Fiskeklubb — Medlemsportal</p>
-        {[['Brukernavn', username, setUsername, 'text'], ['Passord', password, setPassword, 'password']].map(([lbl, val, set, type]) => (
-          <div key={lbl} style={{ textAlign: 'left', marginBottom: '.85rem' }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: CO.mist, marginBottom: 4 }}>{lbl}</label>
-            <input type={type} value={val} onChange={(e) => set(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && attempt()} style={{ width: '100%', background: 'rgba(255,255,255,.06)', border: `1px solid ${error ? 'rgba(220,80,80,.5)' : 'rgba(200,146,42,.25)'}`, borderRadius: 6, padding: '10px 13px', color: CO.cream, fontSize: 15, outline: 'none', fontFamily: 'inherit' }} />
-          </div>
-        ))}
-        {error && <p style={{ color: '#e07070', fontSize: 13, marginBottom: 8 }}>Feil brukernavn eller passord.</p>}
-        <button onClick={attempt} style={{ width: '100%', background: CO.gold, color: CO.deep, border: '1px solid transparent', borderRadius: 6, padding: '9px 13px', fontWeight: 700, fontSize: 15, marginTop: 6, fontFamily: 'inherit', cursor: 'pointer', display: 'block', boxSizing: 'border-box' }}>Logg inn</button>
+        <div style={{ boxSizing: 'border-box', width: '100%' }}>
+          {[['Brukernavn', username, setUsername, 'text'], ['Passord', password, setPassword, 'password']].map(([lbl, val, set, type]) => (
+            <div key={lbl} style={{ textAlign: 'left', marginBottom: '.85rem' }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: CO.mist, marginBottom: 4 }}>{lbl}</label>
+              <input type={type} value={val} onChange={(e) => set(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && attempt()}
+                style={{ display: 'block', width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,.06)', border: `1px solid ${error ? 'rgba(220,80,80,.5)' : 'rgba(200,146,42,.25)'}`, borderRadius: 6, padding: '10px 13px', color: CO.cream, fontSize: 15, outline: 'none', fontFamily: 'inherit' }} />
+            </div>
+          ))}
+          {error && <p style={{ color: '#e07070', fontSize: 13, marginBottom: 8 }}>Feil brukernavn eller passord.</p>}
+          <button onClick={attempt}
+            style={{ display: 'block', width: '100%', boxSizing: 'border-box', background: CO.gold, color: CO.deep, border: '1px solid transparent', borderRadius: 6, padding: '10px 13px', fontWeight: 700, fontSize: 15, marginTop: 6, fontFamily: 'inherit', cursor: 'pointer' }}>
+            Logg inn
+          </button>
+        </div>
         <p style={{ marginTop: '1.25rem', fontSize: 12, color: 'rgba(245,240,232,.35)', borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: '1rem' }}>Kontakt styret for innloggingsinfo</p>
       </div>
     </div>
