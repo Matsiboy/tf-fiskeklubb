@@ -184,70 +184,76 @@ function TagPill({ label, onRemove }) {
   return <span className="tf-badge tf-badge-blue" style={{ gap: 4, marginRight: 4, marginBottom: 4 }}>{label}{onRemove && <span onClick={onRemove} style={{ cursor: 'pointer', marginLeft: 2, opacity: .7, fontWeight: 700, fontSize: 13 }}>×</span>}</span>
 }
 function MemberAvatar({ name, photo, size = 48 }) {
-  if (photo) return <img src={photo} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+  if (photo) return <img src={photoSrc(photo)} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', objectPosition: `${photoX(photo)}% ${photoY(photo)}%`, display: 'block' }} />
   return <div style={{ width: size, height: size, borderRadius: '50%', background: `linear-gradient(135deg,${CO.forest},${CO.river})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Playfair Display',serif", fontSize: size * 0.33, color: CO.gold, fontWeight: 700, flexShrink: 0 }}>{getInitials(name)}</div>
 }
 
 // Photo upload helper component
+// photo is stored as { src: base64string, x: 50, y: 50 } — or plain string for legacy
+function photoSrc(p) { return p && typeof p === 'object' ? p.src : p }
+function photoX(p)   { return p && typeof p === 'object' ? (p.x ?? 50) : 50 }
+function photoY(p)   { return p && typeof p === 'object' ? (p.y ?? 50) : 50 }
+
 function PhotoUpload({ photo, onPhoto, onClear, circle = false, label = 'Last opp bilde' }) {
   const [uploading, setUploading] = useState(false)
-  // offset = { x, y } as percentages (0–100), representing the background-position
-  const [offset, setOffset] = useState({ x: 50, y: 50 })
   const dragRef = useRef(null)
   const containerRef = useRef(null)
+
+  const src = photoSrc(photo)
+  const ox  = photoX(photo)
+  const oy  = photoY(photo)
 
   const handleFile = async (e) => {
     const file = e.target.files[0]; if (!file) return
     setUploading(true)
-    setOffset({ x: 50, y: 50 }) // reset position on new upload
-    try { const b64 = await fileToBase64(file, circle ? 400 : 1200); onPhoto(b64) } catch {}
+    try {
+      const b64 = await fileToBase64(file, circle ? 400 : 1200)
+      onPhoto({ src: b64, x: 50, y: 50 })
+    } catch {}
     setUploading(false)
   }
 
-  // Pointer drag handlers — move the background-position
   const onPointerDown = (e) => {
-    if (!photo) return
+    if (!src) return
     e.preventDefault()
-    dragRef.current = { startX: e.clientX, startY: e.clientY, startOX: offset.x, startOY: offset.y }
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startOX: ox, startOY: oy }
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerup', onPointerUp)
   }
   const onPointerMove = (e) => {
     if (!dragRef.current) return
-    const container = containerRef.current
-    if (!container) return
-    const rect = container.getBoundingClientRect()
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
     const dx = e.clientX - dragRef.current.startX
     const dy = e.clientY - dragRef.current.startY
-    // Convert pixel delta to percentage of container
-    const pctX = dragRef.current.startOX - (dx / rect.width)  * 100
-    const pctY = dragRef.current.startOY - (dy / rect.height) * 100
-    setOffset({ x: Math.max(0, Math.min(100, pctX)), y: Math.max(0, Math.min(100, pctY)) })
+    const newX = Math.max(0, Math.min(100, dragRef.current.startOX - (dx / rect.width)  * 100))
+    const newY = Math.max(0, Math.min(100, dragRef.current.startOY - (dy / rect.height) * 100))
+    onPhoto({ src, x: newX, y: newY })
   }
   const onPointerUp = () => {
     dragRef.current = null
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('pointerup', onPointerUp)
   }
-
   useEffect(() => () => {
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('pointerup', onPointerUp)
   }, [])
 
   const containerStyle = circle
-    ? { position: 'relative', width: 80, height: 80, borderRadius: '50%', border: `2px dashed ${photo ? '#c8922a' : '#d0c8b8'}`, overflow: 'hidden', flexShrink: 0, cursor: photo ? 'grab' : 'pointer', background: '#faf7f2' }
-    : { position: 'relative', width: '100%', height: 140, borderRadius: 8, border: `2px dashed ${photo ? '#c8922a' : '#d0c8b8'}`, overflow: 'hidden', cursor: photo ? 'grab' : 'pointer', background: '#faf7f2' }
+    ? { position: 'relative', width: 80, height: 80, borderRadius: '50%', border: `2px dashed ${src ? '#c8922a' : '#d0c8b8'}`, overflow: 'hidden', flexShrink: 0, cursor: src ? 'grab' : 'pointer', background: '#faf7f2', touchAction: 'none' }
+    : { position: 'relative', width: '100%', height: 140, borderRadius: 8, border: `2px dashed ${src ? '#c8922a' : '#d0c8b8'}`, overflow: 'hidden', cursor: src ? 'grab' : 'pointer', background: '#faf7f2', touchAction: 'none' }
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
       <div ref={containerRef} style={containerStyle} onPointerDown={onPointerDown}>
-        {photo ? (
+        {src ? (
           <>
-            <img src={photo} alt="preview" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${offset.x}% ${offset.y}%`, pointerEvents: 'none', userSelect: 'none', WebkitUserSelect: 'none' }} draggable={false} />
-            {/* Drag hint overlay */}
-            <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.75)', pointerEvents: 'none', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
-              ✥ Dra for å sentrere
+            <img src={src} alt="preview"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${ox}% ${oy}%`, pointerEvents: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+              draggable={false} />
+            <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.8)', pointerEvents: 'none', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+              ✥ Dra for å justere
             </div>
           </>
         ) : (
@@ -256,19 +262,16 @@ function PhotoUpload({ photo, onPhoto, onClear, circle = false, label = 'Last op
             {!circle && <div style={{ fontSize: 11, color: CO.muted }}>{label}</div>}
           </div>
         )}
-        {/* Invisible file input — only active when no photo yet */}
-        {!photo && <input type="file" accept="image/*" onChange={handleFile} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />}
+        {!src && <input type="file" accept="image/*" onChange={handleFile} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />}
       </div>
-
       <div style={{ flex: 1 }}>
-        {!photo && <p style={{ fontSize: 12, color: CO.muted, lineHeight: 1.5 }}>Klikk for å laste opp bilde.</p>}
-        {photo && !circle && <p style={{ fontSize: 12, color: CO.muted, lineHeight: 1.5, marginBottom: 6 }}>Dra bildet for å velge utsnitt.</p>}
+        {!src && <p style={{ fontSize: 12, color: CO.muted, lineHeight: 1.5 }}>Klikk for å laste opp bilde.</p>}
+        {src && <p style={{ fontSize: 12, color: CO.muted, marginBottom: 6 }}>Dra bildet for å velge utsnitt.</p>}
         {uploading && <p style={{ fontSize: 12, color: CO.gold }}>Laster opp…</p>}
-        {photo && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+        {src && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <label style={{ fontSize: 12, color: CO.river, textDecoration: 'underline', cursor: 'pointer' }}>
-              Bytt bilde
-              <input type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+              Bytt bilde<input type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
             </label>
             <button onClick={onClear} style={{ fontSize: 12, color: '#c0392b', textDecoration: 'underline', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}>Fjern bilde</button>
           </div>
@@ -467,14 +470,14 @@ function NewsPage({ news, setNews, showToast }) {
         {sortedNews.map((n) => (
           <div key={n.id} className="tf-card">
             {n.photo
-              ? <img src={n.photo} alt={n.title} style={{ width: '100%', height: 160, objectFit: 'cover' }} />
+              ? <img src={photoSrc(n.photo)} alt={n.title} style={{ width: '100%', height: 160, objectFit: 'cover', objectPosition: `${photoX(n.photo)}% ${photoY(n.photo)}%` }} />
               : <div style={{ height: 110, background: `linear-gradient(135deg,${n.color || CO.forest} 0%,${CO.river} 100%)`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ position: 'absolute', top: 9, left: 9, background: CO.gold, color: CO.deep, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '2px 8px', borderRadius: 3 }}>{n.badge}</span>
                   <svg width="45" height="45" viewBox="0 0 80 80" fill="none" opacity=".2"><path d="M15 60 Q30 30 50 45 Q65 55 70 35" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round" /><circle cx="50" cy="45" r="5" fill={CO.gold} /></svg>
                 </div>
             }
             <div style={{ padding: '1rem' }}>
-              {n.photo && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}><span style={{ background: CO.gold, color: CO.deep, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '2px 8px', borderRadius: 3 }}>{n.badge}</span></div>}
+              {photoSrc(n.photo) && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}><span style={{ background: CO.gold, color: CO.deep, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', padding: '2px 8px', borderRadius: 3 }}>{n.badge}</span></div>}
               <p style={{ fontSize: 12, color: CO.muted, marginBottom: 3 }}>{formatDate(n.date)}</p>
               <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, color: CO.forest, marginBottom: 5, lineHeight: 1.3, fontSize: '.95rem' }}>{n.title}</p>
               <p style={{ fontSize: 13, color: CO.muted, lineHeight: 1.6, marginBottom: 10 }}>{n.text}</p>
@@ -490,13 +493,13 @@ function NewsPage({ news, setNews, showToast }) {
         <Modal title={editId ? 'Rediger nyhet' : 'Ny nyhet'} onClose={() => setOpen(false)}>
           <FormRow label="Bilde">
             <PhotoUpload photo={form.photo} onPhoto={(v) => f('photo', v)} onClear={() => f('photo', '')} label="Last opp nyhetsbilde" />
-            {form.photo && <button onClick={() => f('photo', '')} style={{ fontSize: 12, color: '#c0392b', marginTop: 6, textDecoration: 'underline', cursor: 'pointer', display: 'block' }}>Fjern bilde</button>}
+            {photoSrc(form.photo) && <button onClick={() => f('photo', '')} style={{ fontSize: 12, color: '#c0392b', marginTop: 6, textDecoration: 'underline', cursor: 'pointer', display: 'block' }}>Fjern bilde</button>}
           </FormRow>
           <FormRow label="Dato"><TFInput value={form.date} onChange={(v) => f('date', v)} type="date" /></FormRow>
           <FormRow label="Badge"><TFSelect value={form.badge} onChange={(v) => f('badge', v)} options={NEWS_BADGES} /></FormRow>
           <FormRow label="Tittel"><TFInput value={form.title} onChange={(v) => f('title', v)} placeholder="Overskrift…" /></FormRow>
           <FormRow label="Ingress"><TFInput value={form.text} onChange={(v) => f('text', v)} placeholder="Kort beskrivelse…" multiline /></FormRow>
-          {!form.photo && <FormRow label="Kortfarge"><div style={{ display: 'flex', gap: 8 }}>{NEWS_COLORS.map((col) => <div key={col} onClick={() => f('color', col)} style={{ width: 30, height: 30, borderRadius: 6, background: col, cursor: 'pointer', border: form.color === col ? `3px solid ${CO.gold}` : '2px solid transparent' }} />)}</div></FormRow>}
+          {!photoSrc(form.photo) && <FormRow label="Kortfarge"><div style={{ display: 'flex', gap: 8 }}>{NEWS_COLORS.map((col) => <div key={col} onClick={() => f('color', col)} style={{ width: 30, height: 30, borderRadius: 6, background: col, cursor: 'pointer', border: form.color === col ? `3px solid ${CO.gold}` : '2px solid transparent' }} />)}</div></FormRow>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: '.5rem' }}>
             <TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn>
             <TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Publiser'}</TFBtn>
@@ -700,7 +703,7 @@ function MerchPage({ merch, setMerch, showToast }) {
         {merch.map((item) => (
           <div key={item.id} className="tf-card">
             {item.photo
-              ? <img src={item.photo} alt={item.name} style={{ width: '100%', height: 200, objectFit: 'cover' }} />
+              ? <img src={photoSrc(item.photo)} alt={item.name} style={{ width: '100%', height: 200, objectFit: 'cover', objectPosition: `${photoX(item.photo)}% ${photoY(item.photo)}%` }} />
               : <div style={{ height: 160, background: `linear-gradient(135deg,${CO.forest},${CO.river})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🧢</div>
             }
             <div style={{ padding: '1rem' }}>
@@ -721,7 +724,7 @@ function MerchPage({ merch, setMerch, showToast }) {
         <Modal title={editId ? 'Rediger produkt' : 'Nytt produkt'} onClose={() => setOpen(false)}>
           <FormRow label="Produktbilde">
             <PhotoUpload photo={form.photo} onPhoto={(v) => f('photo', v)} onClear={() => f('photo', '')} label="Last opp produktbilde" />
-            {form.photo && <button onClick={() => f('photo', '')} style={{ fontSize: 12, color: '#c0392b', marginTop: 6, textDecoration: 'underline', cursor: 'pointer', display: 'block' }}>Fjern bilde</button>}
+            {photoSrc(form.photo) && <button onClick={() => f('photo', '')} style={{ fontSize: 12, color: '#c0392b', marginTop: 6, textDecoration: 'underline', cursor: 'pointer', display: 'block' }}>Fjern bilde</button>}
           </FormRow>
           <FormRow label="Produktnavn"><TFInput value={form.name} onChange={(v) => f('name', v)} placeholder="T&F Caps" /></FormRow>
           <FormRow label="Beskrivelse"><TFInput value={form.desc} onChange={(v) => f('desc', v)} placeholder="Kvalitetscaps med klubblogo, en størrelse…" multiline /></FormRow>
