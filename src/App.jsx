@@ -649,7 +649,7 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
       )}
       <div className="tf-card" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 500 }}>
-          <thead><tr style={{ background: CO.forest }}>{['#', 'Fisker', 'Art', 'Vekt', 'Lengde', 'Vann', 'Metode', 'Dato', ''].map((h) => <th key={h} style={{ padding: '9px 11px', textAlign: 'left', color: CO.mist, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>{h}</th>)}</tr></thead>
+          <thead><tr style={{ background: CO.forest }}>{['#', 'Fisker', 'Art', 'Vekt', 'Lengde', 'K-faktor', 'Vann', 'Metode', 'Dato', ''].map((h) => <th key={h} style={{ padding: '9px 11px', textAlign: 'left', color: CO.mist, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>{h}</th>)}</tr></thead>
           <tbody>
             {sorted.map((c, i) => (
               <tr key={c.id} style={{ borderBottom: `1px solid ${CO.creamDk}`, background: i % 2 === 0 ? CO.white : '#faf7f2' }}>
@@ -659,7 +659,13 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
                 <td style={{ padding: '9px 11px', fontWeight: 700, color: CO.forest }}>{c.weight} kg</td>
                 <td style={{ padding: '9px 11px' }}>{c.length} cm</td>
                 <td style={{ padding: '9px 11px', whiteSpace: 'nowrap' }}>
-                  {(() => { const k = kFactor(c.weight, c.length); return k ? <span title={kLabel(k)} style={{ fontWeight: 700, color: parseFloat(k) >= 1.1 ? '#2d7a2d' : parseFloat(k) >= 0.8 ? '#b87d00' : '#c0392b' }}>{k} <span style={{fontSize:11}}>{kLabel(k)}</span></span> : <span style={{color:CO.muted}}>—</span> })()}
+                  {(() => {
+                    const k = kFactor(c.weight, c.length)
+                    if (!k) return <span style={{color:CO.muted}}>—</span>
+                    const kv = parseFloat(k)
+                    const col = kv >= 1.4 ? '#2d7a2d' : kv >= 1.1 ? '#b87d00' : kv >= 0.8 ? '#c07000' : '#c0392b'
+                    return <span style={{ fontWeight: 700, color: col }}>{k}</span>
+                  })()}
                 </td>
                 <td style={{ padding: '9px 11px', color: CO.muted, whiteSpace: 'nowrap' }}>{c.water}</td>
                 <td style={{ padding: '9px 11px', color: CO.muted }}>{c.method}</td>
