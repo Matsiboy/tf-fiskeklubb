@@ -1035,12 +1035,30 @@ function FishingGame() {
     // ── Player movement ──────────────────────────────────────────────────────
     const SPD = 3.8
     const { keys, player: p } = gs
-    if (keys['ArrowLeft']  || keys['a']) { p.vx = Math.max(p.vx - 0.9, -SPD); p.facingLeft = true  }
-    else if (keys['ArrowRight'] || keys['d']) { p.vx = Math.min(p.vx + 0.9,  SPD); p.facingLeft = false }
-    else p.vx *= 0.82
-    if (keys['ArrowUp']    || keys['w']) p.vy = Math.max(p.vy - 0.9, -SPD)
-    else if (keys['ArrowDown']  || keys['s']) p.vy = Math.min(p.vy + 0.9,  SPD)
-    else p.vy *= 0.82
+    const touch = touchTargetRef.current
+
+    if (touch) {
+      // Touch-follow mode: smoothly chase finger position
+      const dx = touch.x - p.x
+      const dy = touch.y - p.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist > 4) {
+        const speed = Math.min(SPD * 1.2, dist * 0.18)
+        p.vx = (dx / dist) * speed
+        p.vy = (dy / dist) * speed
+        p.facingLeft = dx < 0
+      } else {
+        p.vx *= 0.7; p.vy *= 0.7
+      }
+    } else {
+      // Keyboard mode
+      if (keys['ArrowLeft']  || keys['a']) { p.vx = Math.max(p.vx - 0.9, -SPD); p.facingLeft = true  }
+      else if (keys['ArrowRight'] || keys['d']) { p.vx = Math.min(p.vx + 0.9,  SPD); p.facingLeft = false }
+      else p.vx *= 0.82
+      if (keys['ArrowUp']    || keys['w']) p.vy = Math.max(p.vy - 0.9, -SPD)
+      else if (keys['ArrowDown']  || keys['s']) p.vy = Math.min(p.vy + 0.9,  SPD)
+      else p.vy *= 0.82
+    }
     p.x = Math.max(p.r, Math.min(CW - p.r, p.x + p.vx))
     p.y = Math.max(p.r, Math.min(CH - p.r, p.y + p.vy))
 
@@ -1275,6 +1293,26 @@ function FishingGame() {
   const holdKey = (key) => { if (gsRef.current) gsRef.current.keys[key] = true }
   const releaseKey = (key) => { if (gsRef.current) gsRef.current.keys[key] = false }
 
+  // Touch-follow: finger position drives player directly on mobile
+  const touchTargetRef = useRef(null) // { x, y } in canvas coords
+
+  const canvasToGame = (clientX, clientY) => {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    return {
+      x: ((clientX - rect.left) / rect.width)  * CW,
+      y: ((clientY - rect.top)  / rect.height) * CH,
+    }
+  }
+
+  const onCanvasTouch = (e) => {
+    e.preventDefault()
+    const t = e.touches[0]
+    if (t) touchTargetRef.current = canvasToGame(t.clientX, t.clientY)
+  }
+  const onCanvasTouchEnd = () => { touchTargetRef.current = null }
+
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
@@ -1287,9 +1325,10 @@ function FishingGame() {
           <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🐟</div>
           <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.forest, marginBottom: '.75rem' }}>Feeding Frenzy</h3>
           <p style={{ color: CO.muted, maxWidth: 440, margin: '0 auto 1rem', fontSize: 14, lineHeight: 1.65 }}>
-            Styr den <b style={{color:CO.river}}>blå fisken</b> med <b>piltastene</b> eller <b>WASD</b>.<br/>
-            Spis fisker som er <b>mindre</b> enn deg — du vokser!<br/>
-            <span style={{color:'#c0392b'}}>Farlige fisker har rød stiplet kant.</span> Unngå sluk 🪝, garn og tønner ☠️
+            Styr den <b style={{color:CO.river}}>blå fisken</b> med <b>piltastene</b> / <b>WASD</b> på PC.<br/>
+            På mobil: <b>hold fingeren</b> på skjermen og dra — fisken følger etter!<br/>
+            Spis fisker som er <b>mindre</b> enn deg og voks. <span style={{color:'#c0392b'}}>Rød stiplet kant = farlig!</span><br/>
+            Unngå sluk 🪝, garn 🕸 og gifttønner ☠️
           </p>
           <div style={{ display: 'flex', gap: '.4rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
             {LEVELS_CFG.map((l, i) => <span key={i} style={{ fontSize: 11, background: CO.creamDk, padding: '3px 10px', borderRadius: 20, color: CO.muted }}>L{l.num}: {l.desc}</span>)}
@@ -1306,23 +1345,15 @@ function FishingGame() {
             <span style={{ fontSize: 22, letterSpacing: 2 }}>{'❤️'.repeat(Math.max(0,ui.lives))}{'🖤'.repeat(Math.max(0,3-ui.lives))}</span>
           </div>
 
-          <canvas ref={canvasRef} width={CW} height={CH} style={{ width: '100%', borderRadius: 12, display: 'block' }} />
-
-          {/* Mobile d-pad */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, maxWidth: 180, margin: '10px auto 0' }}>
-            {[
-              [null,  'ArrowUp',    '↑', 0, 1],
-              ['ArrowLeft', null,   '←', 1, 0],
-              [null,  'ArrowDown',  '↓', 1, 2],  // skips middle
-              ['ArrowRight', null,  '→', 1, 2],
-            ].map(([, key, label], i) => (
-              <button key={i} onPointerDown={() => holdKey(key)} onPointerUp={() => releaseKey(key)} onPointerLeave={() => releaseKey(key)}
-                style={{ padding: '12px', fontSize: '1.1rem', borderRadius: 8, border: `1px solid ${CO.creamDk}`, background: CO.white, cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <p style={{ textAlign: 'center', fontSize: 11, color: CO.muted, marginTop: 4 }}>Piltaster / WASD · Knapper på mobil</p>
+          <canvas ref={canvasRef} width={CW} height={CH}
+            onTouchStart={onCanvasTouch}
+            onTouchMove={onCanvasTouch}
+            onTouchEnd={onCanvasTouchEnd}
+            onTouchCancel={onCanvasTouchEnd}
+            style={{ width: '100%', borderRadius: 12, display: 'block', touchAction: 'none' }} />
+          <p style={{ textAlign: 'center', fontSize: 12, color: CO.muted, marginTop: 6 }}>
+            📱 <b>Mobil:</b> Hold fingeren på skjermen og dra fisken &nbsp;·&nbsp; 🖥 <b>PC:</b> Piltaster / WASD
+          </p>
 
           {ui.phase === 'gameover' && (
             <div style={{ textAlign: 'center', marginTop: '1.5rem', background: CO.forest, borderRadius: 12, padding: '2rem' }}>
