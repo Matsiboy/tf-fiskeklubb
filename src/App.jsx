@@ -158,6 +158,21 @@ const GLOBAL_CSS = `
   }
 `
 
+
+// Fultons kondisjonsfaktor: K = (100 * vekt_g) / lengde_cm³
+function kFactor(weightKg, lengthCm) {
+  if (!weightKg || !lengthCm || lengthCm === 0) return null
+  const k = (weightKg * 1000 * 100) / Math.pow(lengthCm, 3)
+  return k.toFixed(2)
+}
+function kLabel(k) {
+  if (!k) return ''
+  const v = parseFloat(k)
+  if (v >= 1.4) return '🟢 Utmerket'
+  if (v >= 1.1) return '🟡 God'
+  if (v >= 0.8) return '🟠 Middels'
+  return '🔴 Lav'
+}
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 function TFBtn({ children, variant = 'ghost', small = false, onClick, style = {} }) {
   const cls = ['tf-btn', variant === 'primary' ? 'tf-primary' : variant === 'danger' ? 'tf-danger' : variant === 'forest' ? 'tf-forest' : 'tf-ghost', small ? 'tf-sm' : ''].join(' ')
@@ -626,6 +641,7 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
               <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, fontSize: '1rem', color: i === 0 ? CO.gold : CO.forest, marginBottom: 2 }}>{c.angler}</p>
               <p style={{ fontSize: '1.25rem', fontWeight: 700, color: i === 0 ? CO.cream : CO.text }}>{c.weight} kg</p>
               <p style={{ fontSize: 12, color: i === 0 ? CO.mist : CO.muted }}>{c.length} cm · {c.species}</p>
+              {kFactor(c.weight, c.length) && <p style={{ fontSize: 12, fontWeight: 700, color: i === 0 ? CO.goldLt : CO.gold, marginTop: 2 }}>K = {kFactor(c.weight, c.length)}</p>}
               <p style={{ fontSize: 11, color: i === 0 ? CO.mist : CO.muted, opacity: .7, marginTop: 2 }}>{c.water}</p>
             </div>
           ))}
@@ -642,6 +658,9 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
                 <td style={{ padding: '9px 11px' }}>{c.species}</td>
                 <td style={{ padding: '9px 11px', fontWeight: 700, color: CO.forest }}>{c.weight} kg</td>
                 <td style={{ padding: '9px 11px' }}>{c.length} cm</td>
+                <td style={{ padding: '9px 11px', whiteSpace: 'nowrap' }}>
+                  {(() => { const k = kFactor(c.weight, c.length); return k ? <span title={kLabel(k)} style={{ fontWeight: 700, color: parseFloat(k) >= 1.1 ? '#2d7a2d' : parseFloat(k) >= 0.8 ? '#b87d00' : '#c0392b' }}>{k} <span style={{fontSize:11}}>{kLabel(k)}</span></span> : <span style={{color:CO.muted}}>—</span> })()}
+                </td>
                 <td style={{ padding: '9px 11px', color: CO.muted, whiteSpace: 'nowrap' }}>{c.water}</td>
                 <td style={{ padding: '9px 11px', color: CO.muted }}>{c.method}</td>
                 <td style={{ padding: '9px 11px', color: CO.muted, whiteSpace: 'nowrap' }}>{formatDate(c.date)}</td>
@@ -874,14 +893,14 @@ function RulesPage({ rules, setRules, showToast }) {
 
 // ─── FISHING GAME — Feeding Frenzy ──────────────────────────────────────────
 const LEVELS_CFG = [
-  { num: 1, fishOnScreen: 12, hazards: [],                     speedMult: 1.0, eatTarget: 8,  desc: 'Spis de minste fiskene!' },
-  { num: 2, fishOnScreen: 14, hazards: [],                     speedMult: 1.2, eatTarget: 10, desc: 'Raskere fisk!' },
-  { num: 3, fishOnScreen: 15, hazards: ['hook'],               speedMult: 1.4, eatTarget: 12, desc: 'Pass deg for sluk! 🪝' },
-  { num: 4, fishOnScreen: 16, hazards: ['hook','hook'],        speedMult: 1.6, eatTarget: 14, desc: 'Enda flere sluk!' },
-  { num: 5, fishOnScreen: 17, hazards: ['hook','net'],         speedMult: 1.8, eatTarget: 16, desc: 'Garn i vannet! 🕸' },
-  { num: 6, fishOnScreen: 18, hazards: ['hook','net','net'],   speedMult: 2.0, eatTarget: 18, desc: 'Dobbelt garn!' },
-  { num: 7, fishOnScreen: 18, hazards: ['hook','net','barrel'],speedMult: 2.2, eatTarget: 20, desc: 'Gifttønner! ☠️' },
-  { num: 8, fishOnScreen: 20, hazards: ['hook','net','barrel','barrel'], speedMult: 2.5, eatTarget: 22, desc: 'Maksimal kaos!' },
+  { num: 1, fishOnScreen: 14, bigRatio: 0.15, hazards: [],                          speedMult: 1.0, eatTarget: 8,  desc: 'Spis de minste fiskene!' },
+  { num: 2, fishOnScreen: 15, bigRatio: 0.20, hazards: [],                          speedMult: 1.4, eatTarget: 10, desc: 'Raskere og større fisk!' },
+  { num: 3, fishOnScreen: 16, bigRatio: 0.25, hazards: ['hook'],                    speedMult: 1.7, eatTarget: 12, desc: 'Pass deg for sluk! 🪝' },
+  { num: 4, fishOnScreen: 17, bigRatio: 0.30, hazards: ['hook','hook'],             speedMult: 2.0, eatTarget: 14, desc: 'Mange store fisk nå!' },
+  { num: 5, fishOnScreen: 18, bigRatio: 0.35, hazards: ['hook','net'],              speedMult: 2.3, eatTarget: 16, desc: 'Garn i vannet! 🕸' },
+  { num: 6, fishOnScreen: 19, bigRatio: 0.40, hazards: ['hook','hook','net'],       speedMult: 2.6, eatTarget: 18, desc: 'Kaotisk farvann!' },
+  { num: 7, fishOnScreen: 20, bigRatio: 0.45, hazards: ['hook','net','barrel'],     speedMult: 3.0, eatTarget: 20, desc: 'Gifttønner! ☠️' },
+  { num: 8, fishOnScreen: 22, bigRatio: 0.50, hazards: ['hook','hook','net','barrel','barrel'], speedMult: 3.5, eatTarget: 22, desc: 'Maksimal kaos!' },
 ]
 
 // Fish types — sorted small to large
@@ -897,23 +916,34 @@ const FISH_TYPES_G = [
   { r: 30, color: '#cc6644', tail: '#aa4422', pts: 60, label: 'Stor laks',    spots: false },
 ]
 
-function makeFish(playerR, lvlSpeed, canvasW, canvasH, forceSmall) {
-  // Weight toward small fish — more smalls available when player is small
-  const maxIdx = forceSmall ? 4 : Math.min(Math.floor(playerR / 4), FISH_TYPES_G.length - 1)
-  const weights = FISH_TYPES_G.slice(0, maxIdx + 1).map((_, i) => maxIdx - i + 1)
-  const total = weights.reduce((a, b) => a + b, 0)
-  let rand = Math.random() * total
-  let idx = 0
-  for (let i = 0; i < weights.length; i++) { rand -= weights[i]; if (rand <= 0) { idx = i; break } }
+function makeFish(playerR, lvlSpeed, canvasW, canvasH, forceSmall, bigRatio = 0.2) {
+  let idx
+  if (forceSmall) {
+    // Force small — pick from bottom 4
+    idx = Math.floor(Math.random() * 4)
+  } else if (Math.random() < bigRatio) {
+    // Spawn a dangerous big fish (top 3)
+    idx = FISH_TYPES_G.length - 1 - Math.floor(Math.random() * 3)
+  } else {
+    // Normal weighted toward small-medium
+    const maxIdx = Math.min(Math.floor(playerR / 3.5), FISH_TYPES_G.length - 2)
+    const weights = FISH_TYPES_G.slice(0, maxIdx + 1).map((_, i) => maxIdx - i + 2)
+    const total = weights.reduce((a, b) => a + b, 0)
+    let rand = Math.random() * total
+    idx = 0
+    for (let i = 0; i < weights.length; i++) { rand -= weights[i]; if (rand <= 0) { idx = i; break } }
+  }
   const type = FISH_TYPES_G[idx]
   const fromLeft = Math.random() > 0.5
+  // Big fish move faster
+  const sizeFactor = 0.8 + (idx / FISH_TYPES_G.length) * 0.6
   return {
     ...type,
     id: Math.random() + Date.now(),
     x: fromLeft ? -type.r - 5 : canvasW + type.r + 5,
     y: type.r + 10 + Math.random() * (canvasH - type.r * 2 - 20),
-    vx: (fromLeft ? 1 : -1) * (0.6 + Math.random() * 0.5) * lvlSpeed,
-    vy: (Math.random() - 0.5) * 0.4 * lvlSpeed,
+    vx: (fromLeft ? 1 : -1) * (0.55 + Math.random() * 0.55) * lvlSpeed * sizeFactor,
+    vy: (Math.random() - 0.5) * 0.45 * lvlSpeed,
   }
 }
 
@@ -980,7 +1010,7 @@ function FishingGame() {
     }
     // Start with full screen of fish — 70% forced small
     for (let i = 0; i < cfg.fishOnScreen; i++) {
-      gs.fish.push(makeFish(playerR, cfg.speedMult, CW, CH, i < Math.floor(cfg.fishOnScreen * 0.7)))
+      gs.fish.push(makeFish(playerR, cfg.speedMult, CW, CH, i < Math.floor(cfg.fishOnScreen * 0.6), cfg.bigRatio))
     }
     // Hazards
     cfg.hazards.forEach(h => gs.hazards.push(makeHazard(h, CW, CH, cfg.speedMult)))
@@ -1017,7 +1047,7 @@ function FishingGame() {
       // If gone off left/right — respawn from opposite side
       if (f.x < -f.r * 3 || f.x > CW + f.r * 3) {
         const fromLeft = f.x > CW / 2
-        const type = FISH_TYPES_G[Math.floor(Math.random() * Math.min(5, FISH_TYPES_G.length))]
+        const type = Math.random() < cfg.bigRatio ? FISH_TYPES_G[FISH_TYPES_G.length - 1 - Math.floor(Math.random() * 3)] : FISH_TYPES_G[Math.floor(Math.random() * Math.min(5, FISH_TYPES_G.length))]
         Object.assign(f, type, {
           x: fromLeft ? -type.r - 5 : CW + type.r + 5,
           y: type.r + 10 + Math.random() * (CH - type.r * 2 - 20),
@@ -1030,7 +1060,7 @@ function FishingGame() {
 
     // ── Maintain fish count — always keep fishOnScreen fish alive ─────────────
     while (gs.fish.length < cfg.fishOnScreen) {
-      gs.fish.push(makeFish(p.r, cfg.speedMult, CW, CH, gs.fish.length < Math.floor(cfg.fishOnScreen * 0.6)))
+      gs.fish.push(makeFish(p.r, cfg.speedMult, CW, CH, gs.fish.length < Math.floor(cfg.fishOnScreen * 0.55), cfg.bigRatio))
     }
 
     // ── Move hazards ──────────────────────────────────────────────────────────
