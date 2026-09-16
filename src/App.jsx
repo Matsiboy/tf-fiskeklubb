@@ -392,6 +392,94 @@ function Hero({ memberCount, waterCount }) {
   )
 }
 
+
+// ─── K-Factor Calculator ──────────────────────────────────────────────────────
+function KFactorCalc() {
+  const [weight, setWeight] = useState('')
+  const [length, setLength] = useState('')
+
+  const k = weight && length ? kFactor(parseFloat(weight), parseFloat(length)) : null
+  const kv = k ? parseFloat(k) : null
+
+  const getBanter = (k) => {
+    if (k >= 2.0) return { emoji: '🏆', color: '#1a7a1a', title: 'Gudommelig fisk!', text: 'Dette er ikke en fisk, dette er en tønne med finner. Monsteret bør konserveres og stilles ut på museum. Snakk om kondisjon!' }
+    if (k >= 1.6) return { emoji: '💪', color: '#2d7a2d', title: 'Eksepsjonell kondisjon!', text: 'Fisken trener tydeligvis mer enn du gjør. Godt fôret, kraftig og stolt. Dette er hva alle fisk burde streve etter.' }
+    if (k >= 1.4) return { emoji: '🌟', color: '#3a8a3a', title: 'Utmerket form!', text: 'En fisk i toppform! Godt stelt vann, god mat og et lykkelig liv. Du har fanget en vinner.' }
+    if (k >= 1.2) return { emoji: '😊', color: '#5a8a1a', title: 'Bra kondisjon!', text: 'Solid fisk! Ikke noe å skamme seg over. Den har spist jevnt og lever et hederlig fiskeliv.' }
+    if (k >= 1.0) return { emoji: '😐', color: '#b87d00', title: 'Middels kondisjon', text: 'Fisken er... grei. Den har overlevd, men ikke akkurat blomstret. Litt som å være på diett mot sin vilje.' }
+    if (k >= 0.85) return { emoji: '😟', color: '#c07000', title: 'Litt tynn...', text: 'Stakkars fisk. Den er tydelig ikke den som får den beste maten i vannet. Eller den er veldig god til å svømme vekk fra mat.' }
+    if (k >= 0.7) return { emoji: '😬', color: '#d04000', title: 'Mager fisk!', text: 'Ønsket: mat. Snarest. Denne fisken har sett bedre dager. Er du sikker på at du ikke nettopp dro opp en pinne?' }
+    if (k >= 0.5) return { emoji: '💀', color: '#c0392b', title: 'Kritisk mager!', text: 'Ring PETA. Denne fisken er på diett ufrivillig. Kondisjonsfaktoren er så lav at den nesten er i minus. Slipp den ut og gi den litt mat!' }
+    return { emoji: '☠️', color: '#8b0000', title: 'Er dette en fisk?!', text: 'Gratulerer, du har fanget et tau. Dette er enten ikke en fisk, eller du har gjort en målefeil. Vi håper det siste. For fiskens skyld.' }
+  }
+
+  const banter = kv ? getBanter(kv) : null
+  const barWidth = kv ? Math.min(100, (kv / 2.0) * 100) : 0
+  const barColor = kv >= 1.4 ? '#2d7a2d' : kv >= 1.1 ? '#c8922a' : kv >= 0.8 ? '#d06000' : '#c0392b'
+
+  return (
+    <div style={{ background: CO.white, border: `1px solid ${CO.creamDk}`, borderRadius: 12, padding: '1.5rem', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1rem' }}>
+        <span style={{ fontSize: '1.5rem' }}>🧮</span>
+        <div>
+          <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.1rem', fontWeight: 700, color: CO.forest, lineHeight: 1.2 }}>K-faktor kalkulator</h3>
+          <p style={{ fontSize: 12, color: CO.muted }}>Fultons kondisjonsfaktor — K = (vekt i gram × 100) / lengde³</p>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+        <div>
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: CO.muted, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Vekt (kg)</label>
+          <input
+            type="number" value={weight} onChange={e => setWeight(e.target.value)}
+            placeholder="f.eks. 1.8"
+            style={{ width: '100%', padding: '9px 12px', border: `1px solid ${CO.creamDk}`, borderRadius: 6, fontSize: 15, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: CO.muted, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Lengde (cm)</label>
+          <input
+            type="number" value={length} onChange={e => setLength(e.target.value)}
+            placeholder="f.eks. 49"
+            style={{ width: '100%', padding: '9px 12px', border: `1px solid ${CO.creamDk}`, borderRadius: 6, fontSize: 15, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+          />
+        </div>
+      </div>
+
+      {k && banter && (
+        <div style={{ animation: 'fadeIn .3s ease' }}>
+          {/* Result bar */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+              <span style={{ fontSize: 13, color: CO.muted }}>Kondisjonsfaktor</span>
+              <span style={{ fontSize: 18, fontWeight: 700, color: barColor }}>K = {k}</span>
+            </div>
+            <div style={{ height: 12, background: CO.creamDk, borderRadius: 6, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${barWidth}%`, background: barColor, borderRadius: 6, transition: 'width .4s ease, background .4s ease' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: CO.muted, marginTop: 3 }}>
+              <span>0.5 (elendig)</span><span>1.0 (middels)</span><span>1.4 (bra)</span><span>2.0+ (monster)</span>
+            </div>
+          </div>
+
+          {/* Banter card */}
+          <div style={{ background: `${banter.color}12`, border: `1.5px solid ${banter.color}40`, borderRadius: 10, padding: '1rem 1.1rem', display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '2rem', flexShrink: 0, lineHeight: 1 }}>{banter.emoji}</span>
+            <div>
+              <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, color: banter.color, fontSize: '1rem', marginBottom: 4 }}>{banter.title}</p>
+              <p style={{ fontSize: 13, color: CO.text, lineHeight: 1.65 }}>{banter.text}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!k && (
+        <p style={{ fontSize: 13, color: CO.muted, textAlign: 'center', padding: '.5rem 0' }}>Skriv inn vekt og lengde for å se kondisjonsfaktoren 👆</p>
+      )}
+    </div>
+  )
+}
+
 // ─── Home ─────────────────────────────────────────────────────────────────────
 function HomePage({ news, events, members, waters, catches, onNavigate }) {
   const topCatch = [...catches].sort((a, b) => b.weight - a.weight)[0]
@@ -403,6 +491,7 @@ function HomePage({ news, events, members, waters, catches, onNavigate }) {
           <span style={{ color: CO.gold, flexShrink: 0 }}>📣</span>
           <span><b>Sesongstart 2025:</b> Fisket åpner 1. juni. Husk å fornye fiskekortavtalen innen 15. mai via kasserer.</span>
         </div>
+        <KFactorCalc />
         {topCatch && (
           <div style={{ background: CO.forest, borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '1.75rem' }}>🏆</span>
