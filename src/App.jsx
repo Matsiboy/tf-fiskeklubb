@@ -1478,8 +1478,10 @@ export default function App() {
     const setters = { news: setNews, events: setEvents, members: setMembers, waters: setWaters, rules: setRules, catches: setCatches, merch: setMerch }
     Promise.all(KEYS.map((k) => fbGet(k))).then((results) => {
       KEYS.forEach((k, i) => {
-        if (results[i] && results[i].length > 0) setters[k](results[i])
-else fbSet(k, SEED[k]) 
+        if (results[i] !== null) {
+          setters[k](results[i])
+        } else {   
+          fbSet(k, SEED[k]) 
       })
     })
     const unsubs = KEYS.map((k) => fbListen(k, (data) => setters[k](data)))
