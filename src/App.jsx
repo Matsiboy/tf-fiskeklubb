@@ -1476,12 +1476,15 @@ export default function App() {
   useEffect(() => {
     const KEYS = ['news', 'events', 'members', 'waters', 'rules', 'catches', 'merch']
     const setters = { news: setNews, events: setEvents, members: setMembers, waters: setWaters, rules: setRules, catches: setCatches, merch: setMerch }
-    Promise.all(KEYS.map((k) => fbGet(k))).then((results) => {
+     Promise.all(KEYS.map((k) => fbGet(k))).then((results) => {
       KEYS.forEach((k, i) => {
         if (results[i] !== null) {
+          // Key exists in Firebase (even if empty array) — always use Firebase data, never overwrite
           setters[k](results[i])
-        } else {   
-          fbSet(k, SEED[k]) 
+        } else {
+          // Key has NEVER existed in Firebase — seed it once
+          fbSet(k, SEED[k])
+        }
       })
     })
     const unsubs = KEYS.map((k) => fbListen(k, (data) => setters[k](data)))
