@@ -409,7 +409,7 @@ function KFactorCalc() {
     if (k >= 1.0) return { emoji: '😐', color: '#b87d00', title: 'Middels kondisjon', text: 'Fisken er... grei. Den har overlevd, men ikke akkurat blomstret. Litt som å være på diett mot sin vilje.' }
     if (k >= 0.85) return { emoji: '😟', color: '#c07000', title: 'Litt tynn...', text: 'Stakkars fisk. Den er tydelig ikke den som får den beste maten i vannet. Eller den er veldig god til å svømme vekk fra mat.' }
     if (k >= 0.7) return { emoji: '😬', color: '#d04000', title: 'Mager fisk!', text: 'Ønsket: mat. Snarest. Denne fisken har sett bedre dager. Er du sikker på at du ikke nettopp dro opp en pinne?' }
-    if (k >= 0.5) return { emoji: '💀', color: '#c0392b', title: 'Kritisk mager!', text: 'Ring PETA. Denne fisken er på diett ufrivillig. Kondisjonsfaktoren er så lav at den nesten er i minus. Slipp den ut og gi den litt mat!' }
+    if (k >= 0.5) return { emoji: '💀', color: '#c0392b', title: 'Ausfish!', text: 'Ring PETA. Denne fisken er på diett ufrivillig. Kondisjonsfaktoren er så lav at den nesten er i minus. Slipp den ut og gi den litt mat!' }
     return { emoji: '☠️', color: '#8b0000', title: 'Er dette en fisk?!', text: 'Gratulerer, du har fanget et tau. Dette er enten ikke en fisk, eller du har gjort en målefeil. Vi håper det siste. For fiskens skyld.' }
   }
 
