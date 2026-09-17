@@ -53,6 +53,8 @@ const SEED = {
     { id: 4, angler: 'Erik Haugen', species: 'Harr', weight: 1.4, length: 46, water: 'Steinelva', method: 'Flue', date: '2025-06-20', note: '' },
   ],
   merch: [],
+  quotes: [],
+  badges: [],
 }
 
 const NO_MONTHS = ['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember']
@@ -340,7 +342,7 @@ const NAV_ITEMS = [
   { id: 'hjem', label: 'Hjem' }, { id: 'nyheter', label: 'Nyheter' },
   { id: 'arrangement', label: 'Arrangement' }, { id: 'fiskevann', label: 'Fiskevann' },
   { id: 'toppliste', label: 'Toppliste' }, { id: 'merch', label: 'Merch' },
-  { id: 'regler', label: 'Regler' }, { id: 'medlemmer', label: 'Medlemmer' },
+  { id: 'regler', label: 'Regler' }, { id: 'sitater', label: 'Sitater' }, { id: 'priser', label: 'Priser' }, { id: 'medlemmer', label: 'Medlemmer' },
   { id: 'spill', label: '🎮 Spill' },
 ]
 function SiteNav({ currentPage, onNavigate, onLogout }) {
@@ -951,6 +953,174 @@ function WatersPage({ waters, setWaters, showToast }) {
   )
 }
 
+
+// ─── Quotes ───────────────────────────────────────────────────────────────────
+function QuotesPage({ quotes, setQuotes, showToast }) {
+  const empty = { author: '', text: '', date: '', context: '' }
+  const [open, setOpen] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [form, setForm] = useState(empty)
+  const [confirmId, setConfirmId] = useState(null)
+  const f = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
+  const openEdit = (q) => { setEditId(q.id); setForm({ ...q }); setOpen(true) }
+  const save = () => {
+    if (!form.text.trim() || !form.author.trim()) return
+    const updated = editId
+      ? quotes.map(q => q.id === editId ? { ...form, id: editId } : q)
+      : [{ ...form, id: nextId(quotes) }, ...quotes]
+    setQuotes(updated); setOpen(false); showToast(editId ? 'Sitat oppdatert' : 'Sitat lagt til')
+  }
+  const remove = (id) => { setQuotes(quotes.filter(q => q.id !== id)); setConfirmId(null); showToast('Sitat slettet') }
+
+  const QUOTE_COLORS = ['#1a2e1a','#2d6a8f','#8b4513','#6b4c8b','#1a5a4a']
+
+  return (
+    <div className="tf-wrap">
+      <div className="tf-ph">
+        <div><p className="tf-label">Klubbens visdomsord</p><h2 className="tf-title">Sitater & minner</h2></div>
+        <TFBtn variant="primary" onClick={openNew}>+ Nytt sitat</TFBtn>
+      </div>
+      {quotes.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', color: CO.muted }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💬</div>
+          <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.2rem', color: CO.forest, marginBottom: '.5rem' }}>Ingen sitater ennå</p>
+          <p style={{ fontSize: 14 }}>Legg til morsomme ting som er sagt på tur, ved bålet eller i båten!</p>
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {quotes.map((q, idx) => {
+          const bg = QUOTE_COLORS[idx % QUOTE_COLORS.length]
+          return (
+            <div key={q.id} style={{ background: bg, borderRadius: 12, padding: '1.5rem 1.75rem', position: 'relative', overflow: 'hidden' }}>
+              {/* Decorative quote mark */}
+              <div style={{ position: 'absolute', top: -10, left: 16, fontSize: '6rem', color: 'rgba(255,255,255,0.07)', fontFamily: 'serif', lineHeight: 1, pointerEvents: 'none', userSelect: 'none' }}>"</div>
+              <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(1rem,2.5vw,1.25rem)', fontStyle: 'italic', color: CO.cream, lineHeight: 1.65, marginBottom: '1rem', position: 'relative', zIndex: 1 }}>
+                "{q.text}"
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '.5rem' }}>
+                <div>
+                  <p style={{ fontWeight: 700, color: CO.goldLt, fontSize: '.95rem' }}>— {q.author}</p>
+                  {q.context && <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{q.context}</p>}
+                  {q.date && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{formatDate(q.date)}</p>}
+                </div>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  <TFBtn small onClick={() => openEdit(q)} style={{ background: 'rgba(255,255,255,0.12)', color: CO.cream, borderColor: 'rgba(255,255,255,0.2)' }}>✏</TFBtn>
+                  <TFBtn small variant="danger" onClick={() => setConfirmId(q.id)} style={{ background: 'rgba(220,60,60,0.2)', color: '#ffaaaa', borderColor: 'rgba(220,60,60,0.3)' }}>🗑</TFBtn>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {open && (
+        <Modal title={editId ? 'Rediger sitat' : 'Nytt sitat'} onClose={() => setOpen(false)}>
+          <FormRow label="Hvem sa det?"><TFInput value={form.author} onChange={v => f('author', v)} placeholder="Ola Nordmann" /></FormRow>
+          <FormRow label="Sitatet"><TFInput value={form.text} onChange={v => f('text', v)} placeholder='"Jeg fikk napp, jeg lover!"' multiline /></FormRow>
+          <FormRow label="Sammenheng (valgfri)"><TFInput value={form.context} onChange={v => f('context', v)} placeholder="Ved Steinelva, etter 4 timer uten napp..." /></FormRow>
+          <FormRow label="Dato (valgfri)"><TFInput value={form.date} onChange={v => f('date', v)} type="date" /></FormRow>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn>
+            <TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Legg til'}</TFBtn>
+          </div>
+        </Modal>
+      )}
+      {confirmId && <ConfirmDialog message="Vil du slette dette sitatet?" onConfirm={() => remove(confirmId)} onCancel={() => setConfirmId(null)} />}
+    </div>
+  )
+}
+
+// ─── Badges ───────────────────────────────────────────────────────────────────
+function BadgesPage({ badges, setBadges, members, showToast }) {
+  const empty = { name: '', desc: '', emoji: '🏆', winner: '', date: '', annual: false }
+  const [open, setOpen] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [form, setForm] = useState(empty)
+  const [confirmId, setConfirmId] = useState(null)
+  const f = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
+  const openEdit = (b) => { setEditId(b.id); setForm({ ...b }); setOpen(true) }
+  const save = () => {
+    if (!form.name.trim()) return
+    const updated = editId
+      ? badges.map(b => b.id === editId ? { ...form, id: editId } : b)
+      : [...badges, { ...form, id: nextId(badges) }]
+    setBadges(updated); setOpen(false); showToast(editId ? 'Premie oppdatert' : 'Premie lagt til')
+  }
+  const remove = (id) => { setBadges(badges.filter(b => b.id !== id)); setConfirmId(null); showToast('Premie slettet') }
+
+  const EMOJIS = ['🏆','🥇','🥈','🥉','🎣','🐟','🦈','⭐','🎖️','🏅','👑','💪','🌟','🎯','🔱']
+  const mnames = ['', ...members.map(m => m.name)]
+
+  return (
+    <div className="tf-wrap">
+      <div className="tf-ph">
+        <div><p className="tf-label">Hall of fame</p><h2 className="tf-title">Priser & meritter</h2></div>
+        <TFBtn variant="primary" onClick={openNew}>+ Ny premie</TFBtn>
+      </div>
+      {badges.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', color: CO.muted }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏆</div>
+          <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.2rem', color: CO.forest, marginBottom: '.5rem' }}>Ingen priser ennå</p>
+          <p style={{ fontSize: 14 }}>Legg til klubbens priser, trofeer og meritter — hvem vant årets Tordivelen Cup?</p>
+        </div>
+      )}
+      <div className="tf-grid">
+        {badges.map(b => (
+          <div key={b.id} className="tf-card" style={{ padding: '1.5rem', borderTop: `4px solid ${CO.gold}`, position: 'relative' }}>
+            {b.annual && (
+              <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', background: 'rgba(200,146,42,.15)', color: CO.gold, border: `1px solid rgba(200,146,42,.3)`, borderRadius: 20, padding: '2px 8px' }}>Årlig</span>
+            )}
+            <div style={{ fontSize: '2.5rem', marginBottom: '.75rem' }}>{b.emoji}</div>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, fontSize: '1.05rem', color: CO.forest, marginBottom: 4 }}>{b.name}</p>
+            {b.desc && <p style={{ fontSize: 13, color: CO.muted, lineHeight: 1.6, marginBottom: 8 }}>{b.desc}</p>}
+            {b.winner && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: CO.cream, borderRadius: 6, padding: '5px 10px', marginBottom: 6 }}>
+                <span style={{ fontSize: 14 }}>🎖️</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: CO.forest }}>Vinner: {b.winner}</span>
+              </div>
+            )}
+            {b.date && <p style={{ fontSize: 11, color: CO.muted, marginBottom: 10 }}>📅 {formatDate(b.date)}</p>}
+            <div style={{ display: 'flex', gap: 5, marginTop: 'auto' }}>
+              <TFBtn small onClick={() => openEdit(b)}>✏ Rediger</TFBtn>
+              <TFBtn small variant="danger" onClick={() => setConfirmId(b.id)}>🗑</TFBtn>
+            </div>
+          </div>
+        ))}
+      </div>
+      {open && (
+        <Modal title={editId ? 'Rediger premie' : 'Ny premie'} onClose={() => setOpen(false)}>
+          <FormRow label="Emoji-ikon">
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {EMOJIS.map(e => (
+                <button key={e} onClick={() => f('emoji', e)}
+                  style={{ fontSize: '1.4rem', width: 38, height: 38, borderRadius: 6, border: `2px solid ${form.emoji === e ? CO.gold : CO.creamDk}`, background: form.emoji === e ? 'rgba(200,146,42,.1)' : CO.white, cursor: 'pointer' }}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          </FormRow>
+          <FormRow label="Navn på premie"><TFInput value={form.name} onChange={v => f('name', v)} placeholder="Årets fisker" /></FormRow>
+          <FormRow label="Beskrivelse"><TFInput value={form.desc} onChange={v => f('desc', v)} placeholder="Deles ut til den som fanger den største fisken..." multiline /></FormRow>
+          <FormRow label="Vinner (valgfri)">
+            <TFSelect value={form.winner} onChange={v => f('winner', v)} options={mnames.map(n => ({ value: n, label: n || '— ingen vinner ennå —' }))} />
+          </FormRow>
+          <FormRow label="Dato (valgfri)"><TFInput value={form.date} onChange={v => f('date', v)} type="date" /></FormRow>
+          <div className="tf-frow" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input type="checkbox" id="annual" checked={form.annual} onChange={e => f('annual', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+            <label htmlFor="annual" style={{ fontSize: 14, color: CO.text, cursor: 'pointer' }}>Årlig pris (deles ut hvert år)</label>
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: '1rem' }}>
+            <TFBtn onClick={() => setOpen(false)}>Avbryt</TFBtn>
+            <TFBtn variant="primary" onClick={save}>{editId ? 'Lagre' : 'Legg til'}</TFBtn>
+          </div>
+        </Modal>
+      )}
+      {confirmId && <ConfirmDialog message="Vil du slette denne premien?" onConfirm={() => remove(confirmId)} onCancel={() => setConfirmId(null)} />}
+    </div>
+  )
+}
+
 // ─── Rules ────────────────────────────────────────────────────────────────────
 function RulesPage({ rules, setRules, showToast }) {
   const [editingId, setEditingId] = useState(null); const [editTitle, setEditTitle] = useState(''); const [editItems, setEditItems] = useState([]); const [newItemText, setNewItemText] = useState(''); const [confirmId, setConfirmId] = useState(null)
@@ -1472,10 +1642,12 @@ export default function App() {
   const [rules, setRules] = useState(SEED.rules)
   const [catches, setCatches] = useState(SEED.catches)
   const [merch, setMerch] = useState(SEED.merch)
+  const [quotes, setQuotes] = useState(SEED.quotes)
+  const [badges, setBadges] = useState(SEED.badges)
 
   useEffect(() => {
-    const KEYS = ['news', 'events', 'members', 'waters', 'rules', 'catches', 'merch']
-    const setters = { news: setNews, events: setEvents, members: setMembers, waters: setWaters, rules: setRules, catches: setCatches, merch: setMerch }
+    const KEYS = ['news', 'events', 'members', 'waters', 'rules', 'catches', 'merch', 'quotes', 'badges']
+    const setters = { news: setNews, events: setEvents, members: setMembers, waters: setWaters, rules: setRules, catches: setCatches, merch: setMerch, quotes: setQuotes, badges: setBadges }
     Promise.all(KEYS.map((k) => fbGet(k))).then((results) => {
       KEYS.forEach((k, i) => {
         if (results[i] !== null) {
@@ -1502,6 +1674,8 @@ export default function App() {
   const setRulesP = makeSetter(setRules, 'rules')
   const setCatchesP = makeSetter(setCatches, 'catches')
   const setMerchP = makeSetter(setMerch, 'merch')
+  const setQuotesP = makeSetter(setQuotes, 'quotes')
+  const setBadgesP = makeSetter(setBadges, 'badges')
 
   const showToast = (msg) => { setToastMsg(msg); if (toastTimer.current) clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToastMsg(null), 2500) }
 
@@ -1518,6 +1692,8 @@ export default function App() {
       {page === 'fiskevann' && <WatersPage waters={waters} setWaters={setWatersP} showToast={showToast} />}
       {page === 'merch' && <MerchPage merch={merch} setMerch={setMerchP} showToast={showToast} />}
       {page === 'regler' && <RulesPage rules={rules} setRules={setRulesP} showToast={showToast} />}
+      {page === 'sitater' && <QuotesPage quotes={quotes} setQuotes={setQuotesP} showToast={showToast} />}
+      {page === 'priser' && <BadgesPage badges={badges} setBadges={setBadgesP} members={members} showToast={showToast} />}
       {page === 'medlemmer' && <MembersPage members={members} setMembers={setMembersP} showToast={showToast} />}
       {page === 'spill' && <FishingGame />}
       <footer style={{ background: CO.deep, color: 'rgba(245,240,232,.5)', padding: '2rem 1rem', textAlign: 'center', borderTop: `1px solid rgba(200,146,42,.2)` }}>
