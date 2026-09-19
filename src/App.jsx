@@ -79,6 +79,15 @@ function fbListen(key, cb) {
   return onSnapshot(doc(db, 'data', key), (snap) => { if (snap.exists()) cb(snap.data().items) }, (err) => console.error(err))
 }
 
+
+function audioToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => resolve(e.target.result) // keep full data URL
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 function fileToBase64(file, maxSize = 600) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -343,6 +352,7 @@ const NAV_ITEMS = [
   { id: 'arrangement', label: 'Arrangement' }, { id: 'fiskevann', label: 'Fiskevann' },
   { id: 'toppliste', label: 'Toppliste' }, { id: 'merch', label: 'Merch' },
   { id: 'regler', label: 'Regler' }, { id: 'sitater', label: 'Sitater' }, { id: 'priser', label: 'Priser' }, { id: 'medlemmer', label: 'Medlemmer' },
+  { id: 'musikk', label: '🎵 Musikk' },
   { id: 'spill', label: '🎮 Spill' },
 ]
 function SiteNav({ currentPage, onNavigate, onLogout }) {
@@ -954,6 +964,145 @@ function WatersPage({ waters, setWaters, showToast }) {
 }
 
 
+
+// ─── Global Audio Player ──────────────────────────────────────────────────────
+function AudioPlayer({ track, onClear }) {
+  const audioRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [volume, setVolume] = useState(0.7)
+
+  useEffect(() => {
+    const a = audioRef.current
+    if (!a) return
+    a.volume = volume
+    const onTime  = () => setProgress(a.currentTime)
+    const onMeta  = () => setDuration(a.duration)
+    const onEnded = () => { setPlaying(false); setProgress(0) }
+    a.addEventListener('timeupdate', onTime)
+    a.addEventListener('loadedmetadata', onMeta)
+    a.addEventListener('ended', onEnded)
+    return () => {
+      a.removeEventListener('timeupdate', onTime)
+      a.removeEventListener('loadedmetadata', onMeta)
+      a.removeEventListener('ended', onEnded)
+    }
+  }, [track])
+
+  useEffect(() => { if (audioRef.current) audioRef.current.volume = volume }, [volume])
+
+  const toggle = () => {
+    const a = audioRef.current; if (!a) return
+    if (playing) { a.pause(); setPlaying(false) } else { a.play(); setPlaying(true) }
+  }
+  const seek = (e) => {
+    const a = audioRef.current; if (!a || !duration) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    a.currentTime = ((e.clientX - rect.left) / rect.width) * duration
+  }
+  const fmt = (s) => { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s/60); return `${m}:${String(Math.floor(s%60)).padStart(2,'0')}` }
+  const pct = duration ? (progress / duration) * 100 : 0
+
+  if (!track) return null
+  return (
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 500, background: CO.forest, borderTop: `2px solid ${CO.gold}`, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 -4px 20px rgba(0,0,0,0.4)' }}>
+      <audio ref={audioRef} src={track.src} />
+      {/* Play/pause */}
+      <button onClick={toggle} style={{ width: 36, height: 36, borderRadius: '50%', background: CO.gold, color: CO.deep, border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {playing ? '⏸' : '▶'}
+      </button>
+      {/* Track name */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 12, fontWeight: 600, color: CO.cream, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>🎵 {track.name}</p>
+        {/* Progress bar */}
+        <div onClick={seek} style={{ height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, cursor: 'pointer', position: 'relative' }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pct}%`, background: CO.gold, borderRadius: 2 }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+          <span>{fmt(progress)}</span><span>{fmt(duration)}</span>
+        </div>
+      </div>
+      {/* Volume */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <span style={{ fontSize: 14 }}>{volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}</span>
+        <input type="range" min="0" max="1" step="0.05" value={volume} onChange={e => setVolume(parseFloat(e.target.value))}
+          style={{ width: 70, accentColor: CO.gold, cursor: 'pointer' }} />
+      </div>
+      {/* Close */}
+      <button onClick={onClear} style={{ color: 'rgba(255,255,255,0.5)', fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, lineHeight: 1 }}>×</button>
+    </div>
+  )
+}
+
+// ─── Music upload page ────────────────────────────────────────────────────────
+function MusicPage({ tracks, setTracks, currentTrack, setCurrentTrack, showToast }) {
+  const [uploading, setUploading] = useState(false)
+  const [confirmId, setConfirmId] = useState(null)
+
+  const handleUpload = async (e) => {
+    const file = e.target.files[0]; if (!file) return
+    if (file.size > 10 * 1024 * 1024) { showToast('Maks 10 MB per sang'); return }
+    setUploading(true)
+    try {
+      const src = await audioToBase64(file)
+      const newTrack = { id: nextId(tracks), name: file.name.replace(/\.[^.]+$/, ''), src }
+      setTracks([...tracks, newTrack])
+      showToast('Sang lastet opp!')
+    } catch { showToast('Feil ved opplasting') }
+    setUploading(false)
+    e.target.value = ''
+  }
+
+  const remove = (id) => {
+    if (currentTrack?.id === id) setCurrentTrack(null)
+    setTracks(tracks.filter(t => t.id !== id))
+    setConfirmId(null); showToast('Sang slettet')
+  }
+
+  return (
+    <div className="tf-wrap" style={{ paddingBottom: currentTrack ? '80px' : undefined }}>
+      <div className="tf-ph">
+        <div><p className="tf-label">Klubbens spilleliste</p><h2 className="tf-title">🎵 Musikk</h2></div>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: CO.gold, color: CO.deep, padding: '7px 14px', borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: 'none' }}>
+          {uploading ? 'Laster opp…' : '+ Last opp sang'}
+          <input type="file" accept="audio/*" onChange={handleUpload} style={{ display: 'none' }} disabled={uploading} />
+        </label>
+      </div>
+      <div style={{ background: 'rgba(200,146,42,0.1)', border: `1px solid rgba(200,146,42,0.3)`, borderRadius: 8, padding: '.85rem 1.1rem', fontSize: 13, marginBottom: '1.5rem', display: 'flex', gap: 10 }}>
+        <span style={{ color: CO.gold }}>ℹ️</span>
+        <span>Last opp MP3 eller annen lydfil (maks 10 MB). Musikken fortsetter å spille mens du navigerer mellom sider!</span>
+      </div>
+      {tracks.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', color: CO.muted }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎵</div>
+          <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.2rem', color: CO.forest, marginBottom: '.5rem' }}>Ingen sanger ennå</p>
+          <p style={{ fontSize: 14 }}>Last opp musikk til klubbens spilleliste. Perfekt til fisketuren!</p>
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+        {tracks.map(t => {
+          const isPlaying = currentTrack?.id === t.id
+          return (
+            <div key={t.id} className="tf-card" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', background: isPlaying ? CO.forest : CO.white, border: isPlaying ? `1px solid ${CO.gold}` : undefined }}>
+              <button onClick={() => setCurrentTrack(isPlaying ? null : t)}
+                style={{ width: 40, height: 40, borderRadius: '50%', background: isPlaying ? CO.gold : CO.creamDk, color: isPlaying ? CO.deep : CO.forest, border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {isPlaying ? '⏹' : '▶'}
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 600, color: isPlaying ? CO.cream : CO.forest, fontSize: '.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>🎵 {t.name}</p>
+                {isPlaying && <p style={{ fontSize: 11, color: CO.gold, marginTop: 2 }}>▶ Spiller nå</p>}
+              </div>
+              <TFBtn small variant="danger" onClick={() => setConfirmId(t.id)} style={isPlaying ? { background: 'rgba(220,60,60,.2)', borderColor: 'rgba(220,60,60,.3)', color: '#ffaaaa' } : {}}>🗑</TFBtn>
+            </div>
+          )
+        })}
+      </div>
+      {confirmId && <ConfirmDialog message="Vil du slette denne sangen?" onConfirm={() => remove(confirmId)} onCancel={() => setConfirmId(null)} />}
+    </div>
+  )
+}
+
 // ─── Quotes ───────────────────────────────────────────────────────────────────
 function QuotesPage({ quotes, setQuotes, showToast }) {
   const empty = { author: '', text: '', date: '', context: '' }
@@ -1032,7 +1181,7 @@ function QuotesPage({ quotes, setQuotes, showToast }) {
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 function BadgesPage({ badges, setBadges, members, showToast }) {
-  const empty = { name: '', desc: '', emoji: '🏆', winner: '', date: '', annual: false }
+  const empty = { name: '', desc: '', emoji: '🏆', winner: '', date: '', annual: false, photo: '' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(empty)
@@ -1071,7 +1220,10 @@ function BadgesPage({ badges, setBadges, members, showToast }) {
             {b.annual && (
               <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', background: 'rgba(200,146,42,.15)', color: CO.gold, border: `1px solid rgba(200,146,42,.3)`, borderRadius: 20, padding: '2px 8px' }}>Årlig</span>
             )}
-            <div style={{ fontSize: '2.5rem', marginBottom: '.75rem' }}>{b.emoji}</div>
+            {photoSrc(b.photo)
+              ? <img src={photoSrc(b.photo)} alt={b.name} style={{ width: '100%', height: 160, objectFit: 'cover', objectPosition: `${photoX(b.photo)}% ${photoY(b.photo)}%`, borderRadius: 6, marginBottom: '.75rem' }} />
+              : <div style={{ fontSize: '2.5rem', marginBottom: '.75rem' }}>{b.emoji}</div>
+            }
             <p style={{ fontFamily: "'Playfair Display',serif", fontWeight: 700, fontSize: '1.05rem', color: CO.forest, marginBottom: 4 }}>{b.name}</p>
             {b.desc && <p style={{ fontSize: 13, color: CO.muted, lineHeight: 1.6, marginBottom: 8 }}>{b.desc}</p>}
             {b.winner && (
@@ -1099,6 +1251,9 @@ function BadgesPage({ badges, setBadges, members, showToast }) {
                 </button>
               ))}
             </div>
+          </FormRow>
+          <FormRow label="Bilde (valgfri)">
+            <PhotoUpload photo={form.photo} onPhoto={v => f('photo', v)} onClear={() => f('photo', '')} label="Last opp prisbilde" />
           </FormRow>
           <FormRow label="Navn på premie"><TFInput value={form.name} onChange={v => f('name', v)} placeholder="Årets fisker" /></FormRow>
           <FormRow label="Beskrivelse"><TFInput value={form.desc} onChange={v => f('desc', v)} placeholder="Deles ut til den som fanger den største fisken..." multiline /></FormRow>
@@ -1644,6 +1799,10 @@ export default function App() {
   const [merch, setMerch] = useState(SEED.merch)
   const [quotes, setQuotes] = useState(SEED.quotes)
   const [badges, setBadges] = useState(SEED.badges)
+  const [tracks, setTracks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('tf_tracks') || '[]') } catch { return [] }
+  })
+  const [currentTrack, setCurrentTrack] = useState(null)
 
   useEffect(() => {
     const KEYS = ['news', 'events', 'members', 'waters', 'rules', 'catches', 'merch', 'quotes', 'badges']
@@ -1676,13 +1835,18 @@ export default function App() {
   const setMerchP = makeSetter(setMerch, 'merch')
   const setQuotesP = makeSetter(setQuotes, 'quotes')
   const setBadgesP = makeSetter(setBadges, 'badges')
+  const setTracksP = (val) => {
+    const v = typeof val === 'function' ? val(tracks) : val
+    setTracks(v)
+    try { localStorage.setItem('tf_tracks', JSON.stringify(v)) } catch {}
+  }
 
   const showToast = (msg) => { setToastMsg(msg); if (toastTimer.current) clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToastMsg(null), 2500) }
 
   if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />
 
   return (
-    <div style={{ minHeight: '100dvh', background: CO.cream }}>
+    <div style={{ minHeight: '100dvh', background: CO.cream, paddingBottom: currentTrack ? 80 : 0 }}>
       <style>{GLOBAL_CSS}</style>
       <SiteNav currentPage={page} onNavigate={setPage} onLogout={() => setLoggedIn(false)} />
       {page === 'hjem' && <HomePage news={news} events={events} members={members} waters={waters} catches={catches} onNavigate={setPage} />}
@@ -1695,12 +1859,14 @@ export default function App() {
       {page === 'sitater' && <QuotesPage quotes={quotes} setQuotes={setQuotesP} showToast={showToast} />}
       {page === 'priser' && <BadgesPage badges={badges} setBadges={setBadgesP} members={members} showToast={showToast} />}
       {page === 'medlemmer' && <MembersPage members={members} setMembers={setMembersP} showToast={showToast} />}
+      {page === 'musikk' && <MusicPage tracks={tracks} setTracks={setTracksP} currentTrack={currentTrack} setCurrentTrack={setCurrentTrack} showToast={showToast} />}
       {page === 'spill' && <FishingGame />}
       <footer style={{ background: CO.deep, color: 'rgba(245,240,232,.5)', padding: '2rem 1rem', textAlign: 'center', borderTop: `1px solid rgba(200,146,42,.2)` }}>
         <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1rem', color: CO.cream, marginBottom: 5 }}>Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua</p>
         <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Lillehammer, Innlandet<br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
       </footer>
       {toastMsg && <Toast message={toastMsg} />}
+      <AudioPlayer track={currentTrack} onClear={() => setCurrentTrack(null)} />
     </div>
   )
 }
