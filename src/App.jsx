@@ -969,14 +969,22 @@ function WatersPage({ waters, setWaters, showToast }) {
 function AudioPlayer({ track, onClear }) {
   const audioRef = useRef(null)
   const [playing, setPlaying] = useState(false)
+  const [muted, setMuted] = useState(false)
   const [progress, setProgress] = useState(0)
   const [duration, setDuration] = useState(0)
   const [volume, setVolume] = useState(0.7)
 
+  // Autoplay whenever a new track is set
   useEffect(() => {
     const a = audioRef.current
-    if (!a) return
-    a.volume = volume
+    if (!a || !track) return
+    a.volume = muted ? 0 : volume
+    setProgress(0)
+    // Autoplay — browsers require user interaction first, so we try and catch silently
+    const playPromise = a.play()
+    if (playPromise !== undefined) {
+      playPromise.then(() => setPlaying(true)).catch(() => setPlaying(false))
+    }
     const onTime  = () => setProgress(a.currentTime)
     const onMeta  = () => setDuration(a.duration)
     const onEnded = () => { setPlaying(false); setProgress(0) }
@@ -990,12 +998,18 @@ function AudioPlayer({ track, onClear }) {
     }
   }, [track])
 
-  useEffect(() => { if (audioRef.current) audioRef.current.volume = volume }, [volume])
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = muted ? 0 : volume
+  }, [volume, muted])
 
   const toggle = () => {
     const a = audioRef.current; if (!a) return
-    if (playing) { a.pause(); setPlaying(false) } else { a.play(); setPlaying(true) }
+    if (playing) { a.pause(); setPlaying(false) }
+    else { a.play().then(() => setPlaying(true)).catch(() => {}) }
   }
+
+  const toggleMute = () => setMuted(m => !m)
+
   const seek = (e) => {
     const a = audioRef.current; if (!a || !duration) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -1006,31 +1020,42 @@ function AudioPlayer({ track, onClear }) {
 
   if (!track) return null
   return (
-    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 500, background: CO.forest, borderTop: `2px solid ${CO.gold}`, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 -4px 20px rgba(0,0,0,0.4)' }}>
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 500, background: CO.forest, borderTop: `2px solid ${CO.gold}`, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 -4px 20px rgba(0,0,0,0.4)' }}>
       <audio ref={audioRef} src={track.src} />
+
       {/* Play/pause */}
-      <button onClick={toggle} style={{ width: 36, height: 36, borderRadius: '50%', background: CO.gold, color: CO.deep, border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <button onClick={toggle} title={playing ? 'Pause' : 'Spill'} style={{ width: 36, height: 36, borderRadius: '50%', background: CO.gold, color: CO.deep, border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {playing ? '⏸' : '▶'}
       </button>
-      {/* Track name */}
+
+      {/* Track name + progress */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 12, fontWeight: 600, color: CO.cream, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>🎵 {track.name}</p>
-        {/* Progress bar */}
+        <p style={{ fontSize: 12, fontWeight: 600, color: muted ? 'rgba(245,240,232,0.4)' : CO.cream, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>
+          🎵 {track.name}
+        </p>
         <div onClick={seek} style={{ height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, cursor: 'pointer', position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pct}%`, background: CO.gold, borderRadius: 2 }} />
+          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pct}%`, background: muted ? 'rgba(200,146,42,0.4)' : CO.gold, borderRadius: 2 }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
           <span>{fmt(progress)}</span><span>{fmt(duration)}</span>
         </div>
       </div>
-      {/* Volume */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-        <span style={{ fontSize: 14 }}>{volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}</span>
-        <input type="range" min="0" max="1" step="0.05" value={volume} onChange={e => setVolume(parseFloat(e.target.value))}
-          style={{ width: 70, accentColor: CO.gold, cursor: 'pointer' }} />
-      </div>
-      {/* Close */}
-      <button onClick={onClear} style={{ color: 'rgba(255,255,255,0.5)', fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, lineHeight: 1 }}>×</button>
+
+      {/* Mute button */}
+      <button onClick={toggleMute} title={muted ? 'Skru på lyd' : 'Demp'} style={{ width: 34, height: 34, borderRadius: '50%', background: muted ? 'rgba(220,60,60,0.25)' : 'rgba(255,255,255,0.1)', color: muted ? '#ff9999' : CO.mist, border: `1px solid ${muted ? 'rgba(220,60,60,0.4)' : 'rgba(255,255,255,0.15)'}`, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {muted ? '🔇' : '🔊'}
+      </button>
+
+      {/* Volume slider — hidden when muted */}
+      {!muted && (
+        <input type="range" min="0" max="1" step="0.05" value={volume}
+          onChange={e => setVolume(parseFloat(e.target.value))}
+          title="Volum"
+          style={{ width: 60, accentColor: CO.gold, cursor: 'pointer', flexShrink: 0 }} />
+      )}
+
+      {/* Stop/close */}
+      <button onClick={onClear} title="Stopp musikk" style={{ color: 'rgba(255,255,255,0.45)', fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 2px' }}>×</button>
     </div>
   )
 }
@@ -1843,7 +1868,11 @@ export default function App() {
 
   const showToast = (msg) => { setToastMsg(msg); if (toastTimer.current) clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToastMsg(null), 2500) }
 
-  if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />
+  if (!loggedIn) return <LoginScreen onLogin={() => {
+    setLoggedIn(true)
+    // Autostart first track if any uploaded
+    if (tracks.length > 0 && !currentTrack) setCurrentTrack(tracks[0])
+  }} />
 
   return (
     <div style={{ minHeight: '100dvh', background: CO.cream, paddingBottom: currentTrack ? 80 : 0 }}>
