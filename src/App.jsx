@@ -325,7 +325,9 @@ function LoginScreen({ onLogin }) {
           <ellipse cx="40" cy="65" rx="18" ry="3" stroke="#4a8fb5" strokeWidth="1" fill="none" opacity=".5" />
         </svg>
         <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.cream, marginBottom: '.2rem' }}>Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua</h1>
-        <p style={{ fontStyle: 'italic', color: CO.mist, marginBottom: '1.75rem', opacity: .8, fontSize: 14 }}>Fiskeklubb — Medlemsportal</p>
+        <p style={{ fontStyle: 'italic', color: CO.mist, marginBottom: '.5rem', opacity: .85, fontSize: 14 }}>Fiskeklubb — Medlemsportal</p>
+        <p style={{ fontStyle: 'italic', color: CO.gold, fontSize: 12, opacity: .75, marginBottom: '.25rem' }}>„Með stöng í hendi, og von í hjarta"</p>
+        <p style={{ fontStyle: 'italic', color: CO.mist, fontSize: 11, opacity: .55, marginBottom: '1.75rem' }}>Med en stang i hendene og håp i hjertet</p>
         <div style={{ boxSizing: 'border-box', width: '100%' }}>
           {[['Brukernavn', username, setUsername, 'text'], ['Passord', password, setPassword, 'password']].map(([lbl, val, set, type]) => (
             <div key={lbl} style={{ textAlign: 'left', marginBottom: '.85rem' }}>
@@ -391,11 +393,11 @@ function Hero({ memberCount, waterCount }) {
         <path d="M0 40 Q150 10 300 40 Q450 70 600 30 Q750 0 900 35 Q1050 70 1200 25 L1200 100 L0 100Z" fill="url(#wg)" />
       </svg>
       <div style={{ position: 'relative', zIndex: 2, maxWidth: 1100, margin: '0 auto', padding: '3.5rem 1rem 2.5rem', width: '100%' }}>
-        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: CO.gold, marginBottom: '.75rem' }}>Stiftet 1987 — Innlandet, Norge</p>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: CO.gold, marginBottom: '.75rem' }}>Stiftet {FOUNDED_YEAR} — Oslo, Norge</p>
         <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(2rem,6vw,3.8rem)', fontWeight: 900, color: CO.cream, lineHeight: 1.05, marginBottom: '1rem' }}>Der stangen møter<br /><em style={{ color: CO.gold }}>stille vann.</em></h1>
         <p style={{ fontSize: 'clamp(.9rem,2.5vw,1.05rem)', color: CO.mist, maxWidth: 440, lineHeight: 1.65, marginBottom: '1.5rem' }}>Tordivelen & Flugua er en fiskeklubb for de som elsker elva, fjellet og kunsten å presentere en flue.</p>
         <div style={{ display: 'flex', gap: '1.75rem', flexWrap: 'wrap' }}>
-          {[[memberCount, 'Aktive medlemmer'], [waterCount, 'Fiskevann'], ['38', 'År med tradisjon']].map(([n, l]) => (
+          {[[memberCount, 'Aktive medlemmer'], [waterCount, 'Fiskevann'], [CLUB_AGE, 'År med lykke']].map(([n, l]) => (
             <div key={l}><span style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.75rem', fontWeight: 700, color: CO.gold, display: 'block' }}>{n}</span><span style={{ fontSize: 11, color: CO.mist, textTransform: 'uppercase', letterSpacing: '.08em' }}>{l}</span></div>
           ))}
         </div>
@@ -501,7 +503,7 @@ function HomePage({ news, events, members, waters, catches, onNavigate }) {
       <div className="tf-wrap">
         <div style={{ background: 'rgba(200,146,42,.1)', border: `1px solid rgba(200,146,42,.3)`, borderRadius: 8, padding: '.85rem 1.1rem', fontSize: 13.5, display: 'flex', gap: 10, marginBottom: '1.75rem' }}>
           <span style={{ color: CO.gold, flexShrink: 0 }}>📣</span>
-          <span><b>Sesongstart 2025:</b> Fisket åpner 1. juni. Husk å fornye fiskekortavtalen innen 15. mai via kasserer.</span>
+          <span><b>Sesongstart {CURRENT_YEAR}:</b> Fisket åpner 1. juni. Husk å fornye fiskekortavtalen innen 15. mai via kasserer.</span>
         </div>
         <KFactorCalc />
         {topCatch && (
@@ -650,7 +652,7 @@ function EventsPage({ events, setEvents, showToast }) {
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
-        <div><p className="tf-label">Kalender</p><h2 className="tf-title">Arrangement 2025</h2></div>
+        <div><p className="tf-label">Kalender</p><h2 className="tf-title">Arrangement {CURRENT_YEAR}</h2></div>
         <TFBtn variant="primary" onClick={openNew}>+ Nytt arrangement</TFBtn>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.7rem' }}>
@@ -683,7 +685,7 @@ function EventsPage({ events, setEvents, showToast }) {
             } else { setForm((p) => ({ ...p, date: '' })) }
           }} type="date" /></FormRow>
           <FormRow label="Tittel"><TFInput value={form.title} onChange={(v) => f('title', v)} placeholder="Arrangementsnavn" /></FormRow>
-          <FormRow label="Sted"><TFInput value={form.location} onChange={(v) => f('location', v)} placeholder="Klubbhuset, Lillehammer" /></FormRow>
+          <FormRow label="Sted"><TFInput value={form.location} onChange={(v) => f('location', v)} placeholder="Nøklevann, Oslo" /></FormRow>
           <FormRow label="Tid"><TFInput value={form.time} onChange={(v) => f('time', v)} placeholder="10:00–14:00" /></FormRow>
           <FormRow label="Merknad"><TFInput value={form.note} onChange={(v) => f('note', v)} placeholder="Valgfritt…" /></FormRow>
           <FormRow label="Type"><TFSelect value={form.tag} onChange={(v) => f('tag', v)} options={EVENT_TAGS} /></FormRow>
@@ -725,7 +727,7 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
-        <div><p className="tf-label">Sesongen 2025</p><h2 className="tf-title">Toppliste — Fangst</h2></div>
+        <div><p className="tf-label">Sesongen {CURRENT_YEAR}</p><h2 className="tf-title">Toppliste — Fangst</h2></div>
         <TFBtn variant="primary" onClick={openNew}>+ Registrer fangst</TFBtn>
       </div>
       <div style={{ display: 'flex', gap: '.6rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1892,7 +1894,7 @@ export default function App() {
       {page === 'spill' && <FishingGame />}
       <footer style={{ background: CO.deep, color: 'rgba(245,240,232,.5)', padding: '2rem 1rem', textAlign: 'center', borderTop: `1px solid rgba(200,146,42,.2)` }}>
         <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1rem', color: CO.cream, marginBottom: 5 }}>Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua</p>
-        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet 1987 · Lillehammer, Innlandet<br />Kontakt: erikhaugen@tf-fiskeklubb.no</p>
+        <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet {FOUNDED_YEAR} · Nøklevann, Oslo<br />Kontakt: rodkyrre@bleikjur.is</p>
       </footer>
       {toastMsg && <Toast message={toastMsg} />}
       <AudioPlayer track={currentTrack} onClear={() => setCurrentTrack(null)} />
