@@ -4,6 +4,11 @@ import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore'
 
 const CREDENTIALS = { medlem: 'stangfisker', admin: 'leder2025' }
 
+const FOUNDED_YEAR = 1987
+const CURRENT_YEAR = new Date().getFullYear()
+const CLUB_AGE = CURRENT_YEAR - FOUNDED_YEAR
+
+
 const CO = {
   forest: '#1a2e1a', deep: '#0f1d0f', river: '#2d6a8f',
   gold: '#c8922a', goldLt: '#e0b050', cream: '#f5f0e8',
