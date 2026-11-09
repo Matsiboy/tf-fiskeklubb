@@ -2031,7 +2031,7 @@ export default function App() {
   }} />
 
   return (
-    <div style={{ minHeight: '100dvh', background: CO.cream, paddingBottom: currentTrack ? 80 : 0 }}>
+    <div style={{ minHeight: "100dvh", backgroundColor: CO.cream, backgroundImage: `linear-gradient(rgba(245,240,232,.93),rgba(245,240,232,.93)), url("${CLUB_LOGO}")`, backgroundPosition: "center center", backgroundSize: "cover, min(70vw, 580px) auto", backgroundRepeat: "no-repeat", backgroundAttachment: "fixed", paddingBottom: currentTrack ? 80 : 0 }}>
       <style>{GLOBAL_CSS}</style>
       <SiteNav currentPage={page} onNavigate={setPage} onLogout={async () => {
         try { await signOut(auth); setLoggedIn(false) }
