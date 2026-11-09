@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { db } from './firebase.js'
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore'
+import { db, auth } from './firebase.js'
+import { doc, getDocFromServer, runTransaction, onSnapshot } from 'firebase/firestore'
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth'
 
 const CREDENTIALS = { medlem: 'stangfisker', admin: 'leder2025' }
 
@@ -16,52 +17,6 @@ const CO = {
   white: '#ffffff', text: '#2a2a2a',
 }
 
-const SEED = {
-  news: [
-    { id: 1, date: '2025-05-14', badge: 'Fangst', title: 'Årsrekord ørret fanget på Steinelva', text: 'Lars Holm satte ny klubbrekord med en 2,3 kg storvokst ørret. Fanget på en hjemmelaget caddis-flue i kveldstimene.', color: '#2d6a8f', photo: '' },
-    { id: 2, date: '2025-05-02', badge: 'Kurs', title: 'Fluebinderkurs 7. juni', text: 'Kjell Andersen holder kurs i tradisjonell fluebinding. Maks 12 plasser.', color: '#1a2e1a', photo: '' },
-    { id: 3, date: '2025-04-28', badge: 'Info', title: 'Ny parkeringsordning ved Langvann', text: 'Fra 1. juni innføres ny parkeringsordning. Parkering kun tillatt i merket område.', color: '#2d6a8f', photo: '' },
-  ],
-  events: [
-    { id: 1, day: '07', month: 'Jun', date: '2025-06-07', title: 'Fluebinderkurs med Kjell Andersen', location: 'Klubbhuset, Lillehammer', time: '10:00–16:00', note: 'Maks 12 plasser', tag: 'Kurs' },
-    { id: 2, day: '14', month: 'Jun', date: '2025-06-14', title: 'Sesongåpningsfiske — Steinelva', location: 'Steinelva, nedre del', time: 'Start 07:00', note: 'Felles grillmat etterpå', tag: 'Sosialt' },
-    { id: 3, day: '06', month: 'Sep', date: '2025-09-06', title: 'Høstkonkurranse — Tordivelen Cup', location: 'Steinelva', time: 'Start 06:00', note: 'Premieutdeling kl. 19:00', tag: 'Konkurranse' },
-  ],
-  members: [
-    { id: 1, name: 'Erik Haugen', role: 'Leder', badge: 'Styre', photo: '' },
-    { id: 2, name: 'Ola Berget', role: 'Kasserer', badge: 'Styre', photo: '' },
-    { id: 3, name: 'Marte Nygård', role: 'Sekretær', badge: 'Styre', photo: '' },
-    { id: 4, name: 'Kjell Andersen', role: 'Sportsleder', badge: 'Styre', photo: '' },
-    { id: 5, name: 'Lars Holm', role: 'Medlem siden 2010', badge: 'Rekordinnehaver', photo: '' },
-    { id: 6, name: 'Anne Bråten', role: 'Medlem siden 2018', badge: '', photo: '' },
-    { id: 7, name: 'Tor Svendsen', role: 'Medlem siden 1995', badge: 'Æresmedlem', photo: '' },
-    { id: 8, name: 'Gunnar Fjeld', role: 'Juniorkontakt', badge: 'Styre', photo: '' },
-    { id: 9, name: 'Ingrid Korsmo', role: 'Miljøkontakt', badge: '', photo: '' },
-  ],
-  waters: [
-    { id: 1, name: 'Steinelva', location: 'Gausdal · 4,2 km', desc: 'Klubbens flaggskip. Rik bestand av storvokst ørret og harr.', tags: ['Ørret', 'Harr', 'Flue + sluk'], mapUrl: 'https://maps.google.com/?q=Steinelva+Gausdal+Norway' },
-    { id: 2, name: 'Langvann', location: 'Øyer · 1,8 km²', desc: 'Stille fjellvann med god ørretbestand. Ideelt for båtfiske og flue fra land.', tags: ['Ørret', 'Båt tillatt', 'Flue'], mapUrl: 'https://maps.google.com/?q=Langvann+Øyer+Norway' },
-    { id: 3, name: 'Håpetjernet', location: 'Lillehammer · 0,4 km²', desc: 'Nylig kalket og gjenopprettet. Åpner forventet sesong 2027.', tags: ['Ørret', 'Stengt til 2027'], mapUrl: 'https://maps.google.com/?q=Lillehammer+Norway' },
-    { id: 4, name: 'Raudalselva', location: 'Ringebu · 2,8 km', desc: 'Villmarkspreget elv. Laks i nedre del i august.', tags: ['Laks', 'Ørret', 'Kun flue'], mapUrl: 'https://maps.google.com/?q=Raudalselva+Ringebu+Norway' },
-    { id: 5, name: 'Bjørntjernet', location: 'Fåvang · 0,6 km²', desc: 'Lavlandssjø med stor abbor og noe gjedde. God for nybegynnere.', tags: ['Abbor', 'Gjedde', 'Alle metoder'], mapUrl: 'https://maps.google.com/?q=Fåvang+Norway' },
-  ],
-  rules: [
-    { id: 1, icon: '🎣', title: 'Fiskeregler', items: ['Gyldig fiskekort og statsavgift kreves', 'Minste tillatte størrelse: 25 cm (ørret), 30 cm (harr)', 'Maks 3 fisk per dag per person', 'Fang & slipp anbefales sterkt', 'Kun flue tillatt på Steinelva øvre del og Raudalselva', 'Levende agn er ikke tillatt'] },
-    { id: 2, icon: '🌿', title: 'Naturhensyn', items: ['Ingen forsøpling — tar med alt man tar med seg ut', 'Bål kun på anviste plasser', 'Respekter ferdselsretten og nærliggende landbruk', 'Bruk vasket og desinfisert utstyr mellom vann', 'Meld fra om ulovlig fiske til lensmann eller styre'] },
-    { id: 3, icon: '👥', title: 'Medlemsforpliktelser', items: ['Kontingent betales innen 31. januar', 'Alle medlemmer bidrar på én dugnadsdag per år', 'Nye medlemmer må godkjennes av styret', 'Brudd på reglene kan medføre utelukkelse', 'Juniormedlemmer under 16 år: gratis innmelding'] },
-    { id: 4, icon: '🏆', title: 'Konkurranseregler', items: ['Tordivelen Cup: poengbasert, kun flue tillatt', 'All fisk veies i live og slippes ut igjen', 'Dommer må bekrefte fangst for å gi poeng', 'Juniorer (under 18) konkurrerer i egen klasse', 'Ingen bruk av ekkolodd eller elektronisk hjelpemiddel'] },
-  ],
-  catches: [
-    { id: 1, angler: 'Lars Holm', species: 'Ørret', weight: 2.3, length: 54, water: 'Steinelva', method: 'Flue', date: '2025-05-14', note: 'Caddis-flue, kveldsfiske' },
-    { id: 2, angler: 'Tor Svendsen', species: 'Laks', weight: 4.1, length: 72, water: 'Raudalselva', method: 'Sluk', date: '2025-08-08', note: 'Sluppet ut igjen' },
-    { id: 3, angler: 'Marte Nygård', species: 'Ørret', weight: 1.8, length: 49, water: 'Langvann', method: 'Flue', date: '2025-07-03', note: 'Fanget fra båt' },
-    { id: 4, angler: 'Erik Haugen', species: 'Harr', weight: 1.4, length: 46, water: 'Steinelva', method: 'Flue', date: '2025-06-20', note: '' },
-  ],
-  merch: [],
-  quotes: [],
-  badges: [],
-}
-
 const NO_MONTHS = ['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember']
 function formatDate(iso) {
   if (!iso) return ''
@@ -74,14 +29,176 @@ function formatDate(iso) {
 const getInitials = (name) => name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 const nextId = (arr) => (arr.length ? Math.max(...arr.map((x) => x.id)) + 1 : 1)
 
+// STORAGE_CORE_START — also exercised without Firebase/network by the regression tests.
+const DATA_KEYS = ['news', 'events', 'members', 'waters', 'rules', 'catches', 'merch', 'quotes', 'badges']
+const REQUIRED = {
+  news: ['title'], events: ['title'], members: ['name'], waters: ['name', 'tags'],
+  rules: ['title', 'items'], catches: ['angler', 'species', 'weight', 'length'],
+  merch: ['name'], quotes: ['author', 'text'], badges: ['name'],
+}
+const STRING_FIELDS = 'date badge title text color day month location time note tag name role desc mapUrl angler species water method price author context icon emoji winner'.split(' ')
+function canonical(value) {
+  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']'
+  if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + canonical(value[k])).join(',') + '}'
+  return JSON.stringify(value)
+}
+function validateItems(key, items, checkSize = true) {
+  const fail = () => { throw new Error(`Ugyldige data i ${key}. Ingen data er endret.`) }
+  if (!DATA_KEYS.includes(key) || !Array.isArray(items)) fail()
+  const ids = new Set()
+  for (const row of items) {
+    if (!row || typeof row !== 'object' || Array.isArray(row) || !Number.isSafeInteger(row.id) || row.id < 1 || ids.has(row.id)) fail()
+    ids.add(row.id)
+    if (REQUIRED[key].some(field => !Object.hasOwn(row, field))) fail()
+    for (const [field, value] of Object.entries(row)) {
+      if (field === 'id') continue
+      if (STRING_FIELDS.includes(field)) { if (typeof value !== 'string') fail() }
+      else if (['tags', 'items'].includes(field)) { if (!Array.isArray(value) || value.some(v => typeof v !== 'string')) fail() }
+      else if (['weight', 'length'].includes(field)) { if (!Number.isFinite(value) || value < 0) fail() }
+      else if (field === 'annual') { if (typeof value !== 'boolean') fail() }
+      else if (field === 'photo') {
+        const src = typeof value === 'string' ? value : value?.src
+        if (typeof src !== 'string' || (src && !/^(https?:\/\/|data:image\/(png|jpeg|webp|gif);base64,)/i.test(src))) fail()
+        if (typeof value !== 'string' && (!value || Object.keys(value).some(k => !['src', 'x', 'y'].includes(k)) || ![value.x, value.y].every(n => Number.isFinite(n) && n >= 0 && n <= 100))) fail()
+      } else fail()
+      if (field === 'mapUrl' && value && !/^https?:\/\//i.test(value)) fail()
+    }
+  }
+  // Conservative headroom below Firestore's 1 MiB document limit, including inline photos.
+  if (checkSize && new TextEncoder().encode(JSON.stringify({ items })).length > 800000) throw new Error(`${key} er for stor (maks 800 kB). Reduser bilder eller datamengden.`)
+  return items
+}
+function readSnapshot(key, snap) {
+  return snap.exists() ? { exists: true, items: validateItems(key, snap.data().items, false) } : { exists: false, items: [] }
+}
 async function fbGet(key) {
-  try { const snap = await getDoc(doc(db, 'data', key)); return snap.exists() ? snap.data().items : null } catch { return null }
+  // A rejected server read is NOT a missing document. Never fall back to seed data.
+  return readSnapshot(key, await getDocFromServer(doc(db, 'data', key)))
 }
-async function fbSet(key, value) {
-  try { await setDoc(doc(db, 'data', key), { items: value }) } catch (e) { console.error(e) }
+async function fbSet(key, value, expected) {
+  validateItems(key, value)
+  if (!Array.isArray(expected)) throw new Error('Data er ikke ferdig lastet.')
+  await runTransaction(db, async tx => {
+    const ref = doc(db, 'data', key)
+    const current = readSnapshot(key, await tx.get(ref))
+    if (canonical(current.items) !== canonical(expected)) throw new Error('Data er endret av en annen bruker. Kopier utkastet, avbryt og åpne på nytt.')
+    tx.set(ref, { items: value }, { merge: true })
+  })
 }
-function fbListen(key, cb) {
-  return onSnapshot(doc(db, 'data', key), (snap) => { if (snap.exists()) cb(snap.data().items) }, (err) => console.error(err))
+function fbListen(key, cb, onError) {
+  return onSnapshot(doc(db, 'data', key), { includeMetadataChanges: true }, snap => {
+    // Cache and optimistic snapshots must not count as successful server reads/saves.
+    if (snap.metadata.fromCache || snap.metadata.hasPendingWrites) return
+    try { cb(readSnapshot(key, snap)) } catch (error) { onError(error) }
+  }, onError)
+}
+async function readBackup() {
+  // Read-only transaction gives a consistent snapshot across all nine documents.
+  return runTransaction(db, async tx => {
+    const result = {}
+    for (const key of DATA_KEYS) result[key] = readSnapshot(key, await tx.get(doc(db, 'data', key)))
+    return result
+  })
+}
+function validateBackup(value) {
+  if (!value || value.format !== 'tf-fiskeklubb' || value.version !== 1 || value.projectId !== db.app.options.projectId || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt))) throw new Error('Ukjent backupformat, versjon eller Firebase-prosjekt.')
+  if (!value.documents || Object.keys(value.documents).sort().join() !== [...DATA_KEYS].sort().join()) throw new Error('Backupen må inneholde alle ni datasett.')
+  for (const key of DATA_KEYS) {
+    const record = value.documents[key]
+    if (!record || typeof record.exists !== 'boolean' || Object.keys(record).sort().join() !== 'exists,items') throw new Error(`Ugyldig dokument: ${key}`)
+    validateItems(key, record.items)
+    if (!record.exists && record.items.length) throw new Error(`Manglende dokument kan ikke inneholde data: ${key}`)
+  }
+  return value
+}
+async function restoreBackup(backup, expected) {
+  validateBackup(backup)
+  await runTransaction(db, async tx => {
+    const current = {}
+    for (const key of DATA_KEYS) current[key] = readSnapshot(key, await tx.get(doc(db, 'data', key)))
+    if (canonical(current) !== canonical(expected)) throw new Error('Serverdata er endret siden forhåndsvisningen. Velg backupfilen på nytt.')
+    for (const key of DATA_KEYS) {
+      // Missing documents in the backup are skipped, never deleted on the server.
+      if (backup.documents[key].exists) tx.set(doc(db, 'data', key), { items: backup.documents[key].items }, { merge: true })
+    }
+  })
+}
+async function requireBackupAdmin() {
+  const user = auth.currentUser
+  if (!user || (await user.getIdTokenResult(true)).claims.admin !== true) throw new Error('Firebase-administrator med admin-claim kreves.')
+}
+// STORAGE_CORE_END
+
+function downloadBackup(documents) {
+  const backup = { format: 'tf-fiskeklubb', version: 1, projectId: db.app.options.projectId, exportedAt: new Date().toISOString(), documents }
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }))
+  const a = document.createElement('a')
+  a.href = url; a.download = `tf-fiskeklubb-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+  a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function BackupPanel({ ready, busy, perform, showToast }) {
+  const [expanded, setExpanded] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [admin, setAdmin] = useState(false)
+  const [preview, setPreview] = useState(null)
+  const [confirmation, setConfirmation] = useState('')
+  const [safetyDownloaded, setSafetyDownloaded] = useState(false)
+  const login = async () => {
+    await perform(async () => {
+      await signInWithEmailAndPassword(auth, email, password)
+      setPassword('')
+      await requireBackupAdmin()
+      setAdmin(true)
+    })
+  }
+  const exportFile = async () => {
+    if (await perform(async () => { await requireBackupAdmin(); downloadBackup(await readBackup()) })) showToast('Backup lastet ned – oppbevar filen trygt')
+  }
+  const selectFile = async e => {
+    const file = e.target.files?.[0]; e.target.value = ''
+    setPreview(null); setConfirmation(''); setSafetyDownloaded(false)
+    if (!file) return
+    await perform(async () => {
+      await requireBackupAdmin()
+      if (file.size > 8000000) throw new Error('Backupfilen er for stor (maks 8 MB).')
+      const backup = validateBackup(JSON.parse(await file.text()))
+      const expected = await readBackup()
+      setPreview({ backup, expected })
+    })
+  }
+  const restore = async () => {
+    if (!preview || !safetyDownloaded || confirmation !== 'GJENOPPRETT') return
+    if (await perform(async () => { await requireBackupAdmin(); await restoreBackup(preview.backup, preview.expected) })) {
+      setPreview(null); setConfirmation(''); setSafetyDownloaded(false); showToast('Gjenoppretting bekreftet av serveren')
+    }
+  }
+  return <div className="tf-wrap" style={{ paddingTop: 12, paddingBottom: 0 }}>
+    <TFBtn small onClick={() => setExpanded(v => !v)}>Sikkerhetskopi (administrator)</TFBtn>
+    {expanded && <fieldset disabled={!ready || busy} style={{ marginTop: 12, border: `1px solid ${CO.gold}`, padding: 16 }}>
+      <p>Manuell JSON-backup av klubbdata og innebygde bilder. Musikk og spillrekorder i denne nettleseren er ikke inkludert. Eksterne bildefiler kopieres ikke. Ingen automatisk backup.</p>
+      {!admin ? <>
+        <p>Separat Firebase-innlogging med administratorrettighet kreves. Klubbens delte passord gir ikke denne tilgangen.</p>
+        <FormRow label="Firebase e-post"><TFInput value={email} onChange={setEmail} type="email" /></FormRow>
+        <FormRow label="Firebase passord"><TFInput value={password} onChange={setPassword} type="password" /></FormRow>
+        <TFBtn onClick={login}>Logg inn for backup</TFBtn>
+      </> : <>
+        <TFBtn onClick={exportFile}>Last ned JSON-backup</TFBtn>{' '}
+        <TFBtn onClick={async () => { if (await perform(() => signOut(auth))) { setAdmin(false); setPreview(null) } }}>Logg ut av backup</TFBtn>
+        <FormRow label="Velg JSON-fil for forhåndsvisning"><input type="file" accept=".json,application/json" onChange={selectFile} /></FormRow>
+        {preview && <>
+          <p role="alert">Advarsel: Import erstatter hele datasett, også med tomme lister. Nyere innhold kan gå tapt. Dokumenter som mangler i backupen hoppes over. Kontroller innholdet og lagre en sikkerhetskopi før du fortsetter.</p>
+          <p>Backup fra {preview.backup.exportedAt}</p>
+          <ul>{DATA_KEYS.map(key => <li key={key}>{key}: {preview.expected[key].items.length} nå → {preview.backup.documents[key].exists ? preview.backup.documents[key].items.length : 'hoppes over'}</li>)}</ul>
+          <TFBtn onClick={() => { downloadBackup(preview.expected); setSafetyDownloaded(true) }}>Last ned sikkerhetskopi av data før import</TFBtn>
+          <FormRow label="Sjekk at filen er lagret. Skriv GJENOPPRETT for å bekrefte erstatning"><TFInput value={confirmation} onChange={setConfirmation} /></FormRow>
+          <button className="tf-btn tf-danger" disabled={!safetyDownloaded || confirmation !== 'GJENOPPRETT'} onClick={restore}>Gjenopprett bekreftet backup</button>
+          <TFBtn onClick={() => setPreview(null)}>Avbryt</TFBtn>
+        </>}
+      </>}
+    </fieldset>}
+  </div>
 }
 
 
@@ -315,7 +432,7 @@ function PhotoUpload({ photo, onPhoto, onClear, circle = false, label = 'Last op
 // ─── Login ────────────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
   const [username, setUsername] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(false)
-  const attempt = () => { if (CREDENTIALS[username.trim().toLowerCase()] === password) onLogin(); else { setError(true); setPassword('') } }
+  const attempt = () => { if (CREDENTIALS[username.trim().toLowerCase()] === password) onLogin(username.trim().toLowerCase()); else { setError(true); setPassword('') } }
   return (
     <div style={{ minHeight: '100dvh', background: CO.deep, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
       <div style={{ background: CO.forest, border: `1px solid rgba(200,146,42,.3)`, borderRadius: 14, padding: '2.5rem 2rem', width: '100%', maxWidth: 380, textAlign: 'center' }}>
@@ -568,6 +685,8 @@ const NEWS_BADGES = ['Nyhet', 'Fangst', 'Kurs', 'Styre', 'Miljø', 'Info', 'Seso
 const NEWS_COLORS = [CO.forest, CO.river, '#3a5a3a', '#6b4a1a']
 
 function NewsPage({ news, setNews, showToast }) {
+  const editBase = useRef(null)
+  const deleteBase = useRef(null)
   const empty = { date: '', badge: 'Nyhet', title: '', text: '', color: CO.river, photo: '' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
@@ -575,14 +694,14 @@ function NewsPage({ news, setNews, showToast }) {
   const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
   const sortedNews = [...news].sort((a, b) => new Date(b.date || '0') - new Date(a.date || '0'))
-  const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
-  const openEdit = (item) => { setEditId(item.id); setForm({ ...item, photo: item.photo || '' }); setOpen(true) }
-  const save = () => {
+  const openNew = () => { editBase.current = news; setEditId(null); setForm(empty); setOpen(true) }
+  const openEdit = (item) => { editBase.current = news; setEditId(item.id); setForm({ ...item, photo: item.photo || '' }); setOpen(true) }
+  const save = async () => {
     if (!form.title.trim()) return
     const updated = editId ? news.map((n) => n.id === editId ? { ...form, id: editId } : n) : [{ ...form, id: nextId(news) }, ...news]
-    setNews(updated); setOpen(false); showToast(editId ? 'Nyhet oppdatert' : 'Nyhet publisert')
+    if (!await setNews(updated, editBase.current)) return; setOpen(false); showToast(editId ? 'Nyhet oppdatert' : 'Nyhet publisert')
   }
-  const remove = (id) => { setNews(news.filter((n) => n.id !== id)); setConfirmId(null); showToast('Nyhet slettet') }
+  const remove = async (id) => { if (!await setNews(news.filter((n) => n.id !== id), deleteBase.current)) return; setConfirmId(null); showToast('Nyhet slettet') }
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
@@ -606,7 +725,7 @@ function NewsPage({ news, setNews, showToast }) {
               <p style={{ fontSize: 13, color: CO.muted, lineHeight: 1.6, marginBottom: 10 }}>{n.text}</p>
               <div style={{ display: 'flex', gap: 5 }}>
                 <TFBtn small onClick={() => openEdit(n)}>✏ Rediger</TFBtn>
-                <TFBtn small variant="danger" onClick={() => setConfirmId(n.id)}>🗑 Slett</TFBtn>
+                <TFBtn small variant="danger" onClick={() => { deleteBase.current = news; setConfirmId(n.id) } }>🗑 Slett</TFBtn>
               </div>
             </div>
           </div>
@@ -639,6 +758,8 @@ const EVENT_TAGS = ['Kurs', 'Sosialt', 'Stevne', 'Konkurranse', 'Info', 'Dugnad'
 const TAG_STYLES = { Kurs: ['rgba(45,106,143,.12)', '#1a5070'], Sosialt: ['rgba(26,78,26,.12)', '#1a4a1a'], Stevne: ['rgba(200,146,42,.15)', '#5a3a00'], Konkurranse: ['rgba(180,50,50,.12)', '#4a1a1a'], Info: ['rgba(80,80,180,.12)', '#3a3a6a'], Dugnad: ['rgba(100,100,100,.12)', '#3a3a3a'] }
 
 function EventsPage({ events, setEvents, showToast }) {
+  const editBase = useRef(null)
+  const deleteBase = useRef(null)
   const empty = { day: '', month: '', date: '', title: '', location: '', time: '', note: '', tag: 'Sosialt' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
@@ -646,14 +767,14 @@ function EventsPage({ events, setEvents, showToast }) {
   const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
   const sortedEvents = [...events].sort((a, b) => new Date(a.date || '9999') - new Date(b.date || '9999'))
-  const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
-  const openEdit = (ev) => { setEditId(ev.id); setForm({ ...ev }); setOpen(true) }
-  const save = () => {
+  const openNew = () => { editBase.current = events; setEditId(null); setForm(empty); setOpen(true) }
+  const openEdit = (ev) => { editBase.current = events; setEditId(ev.id); setForm({ ...ev }); setOpen(true) }
+  const save = async () => {
     if (!form.title.trim()) return
     const updated = editId ? events.map((e) => e.id === editId ? { ...form, id: editId } : e) : [...events, { ...form, id: nextId(events) }]
-    setEvents(updated); setOpen(false); showToast(editId ? 'Arrangement oppdatert' : 'Arrangement lagt til')
+    if (!await setEvents(updated, editBase.current)) return; setOpen(false); showToast(editId ? 'Arrangement oppdatert' : 'Arrangement lagt til')
   }
-  const remove = (id) => { setEvents(events.filter((e) => e.id !== id)); setConfirmId(null); showToast('Arrangement slettet') }
+  const remove = async (id) => { if (!await setEvents(events.filter((e) => e.id !== id), deleteBase.current)) return; setConfirmId(null); showToast('Arrangement slettet') }
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
@@ -675,7 +796,7 @@ function EventsPage({ events, setEvents, showToast }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' }}>
                 <span className="tf-badge tf-ev-tag" style={{ background: bg, color: col, border: 'none' }}>{ev.tag}</span>
-                <div style={{ display: 'flex', gap: 5 }}><TFBtn small onClick={() => openEdit(ev)}>✏</TFBtn><TFBtn small variant="danger" onClick={() => setConfirmId(ev.id)}>🗑</TFBtn></div>
+                <div style={{ display: 'flex', gap: 5 }}><TFBtn small onClick={() => openEdit(ev)}>✏</TFBtn><TFBtn small variant="danger" onClick={() => { deleteBase.current = events; setConfirmId(ev.id) } }>🗑</TFBtn></div>
               </div>
             </div>
           )
@@ -708,6 +829,8 @@ const METHOD_LIST = ['Flue', 'Sluk', 'Mark', 'Wobbler', 'Isfiske', 'Pilk', 'Stik
 const MEDALS = ['🥇', '🥈', '🥉']
 
 function CatchesPage({ catches, setCatches, members, waters, showToast }) {
+  const editBase = useRef(null)
+  const deleteBase = useRef(null)
   const mnames = members.map((m) => m.name)
   const wnames = waters.map((w) => w.name)
   const empty = { angler: mnames[0] || '', species: 'Ørret', weight: '', length: '', water: wnames[0] || '', method: 'Flue', date: '', note: '' }
@@ -720,15 +843,15 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
   const allSpecies = ['Alle', ...new Set(catches.map((c) => c.species))]
   const sorted = [...catches].filter((c) => filterSpecies === 'Alle' || c.species === filterSpecies).sort((a, b) => sortBy === 'weight' ? b.weight - a.weight : b.length - a.length)
-  const openNew = () => { setEditId(null); setForm({ ...empty, angler: mnames[0] || '', water: wnames[0] || '' }); setOpen(true) }
-  const openEdit = (c) => { setEditId(c.id); setForm({ ...c, weight: String(c.weight), length: String(c.length) }); setOpen(true) }
-  const save = () => {
+  const openNew = () => { editBase.current = catches; setEditId(null); setForm({ ...empty, angler: mnames[0] || '', water: wnames[0] || '' }); setOpen(true) }
+  const openEdit = (c) => { editBase.current = catches; setEditId(c.id); setForm({ ...c, weight: String(c.weight), length: String(c.length) }); setOpen(true) }
+  const save = async () => {
     if (!form.angler || !form.weight) return
     const entry = { ...form, id: editId || nextId(catches), weight: parseFloat(form.weight) || 0, length: parseFloat(form.length) || 0 }
     const updated = editId ? catches.map((c) => c.id === editId ? entry : c) : [entry, ...catches]
-    setCatches(updated); setOpen(false); showToast(editId ? 'Fangst oppdatert' : 'Fangst registrert')
+    if (!await setCatches(updated, editBase.current)) return; setOpen(false); showToast(editId ? 'Fangst oppdatert' : 'Fangst registrert')
   }
-  const remove = (id) => { setCatches(catches.filter((c) => c.id !== id)); setConfirmId(null); showToast('Fangst slettet') }
+  const remove = async (id) => { if (!await setCatches(catches.filter((c) => c.id !== id), deleteBase.current)) return; setConfirmId(null); showToast('Fangst slettet') }
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
@@ -778,7 +901,7 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
                 <td style={{ padding: '9px 11px', color: CO.muted, whiteSpace: 'nowrap' }}>{c.water}</td>
                 <td style={{ padding: '9px 11px', color: CO.muted }}>{c.method}</td>
                 <td style={{ padding: '9px 11px', color: CO.muted, whiteSpace: 'nowrap' }}>{formatDate(c.date)}</td>
-                <td style={{ padding: '9px 11px' }}><div style={{ display: 'flex', gap: 5 }}><TFBtn small onClick={() => openEdit(c)}>✏</TFBtn><TFBtn small variant="danger" onClick={() => setConfirmId(c.id)}>🗑</TFBtn></div></td>
+                <td style={{ padding: '9px 11px' }}><div style={{ display: 'flex', gap: 5 }}><TFBtn small onClick={() => openEdit(c)}>✏</TFBtn><TFBtn small variant="danger" onClick={() => { deleteBase.current = catches; setConfirmId(c.id) } }>🗑</TFBtn></div></td>
               </tr>
             ))}
           </tbody>
@@ -807,20 +930,22 @@ function CatchesPage({ catches, setCatches, members, waters, showToast }) {
 
 // ─── Merch ────────────────────────────────────────────────────────────────────
 function MerchPage({ merch, setMerch, showToast }) {
+  const editBase = useRef(null)
+  const deleteBase = useRef(null)
   const empty = { name: '', desc: '', price: '', photo: '' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(empty)
   const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
-  const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
-  const openEdit = (item) => { setEditId(item.id); setForm({ ...item }); setOpen(true) }
-  const save = () => {
+  const openNew = () => { editBase.current = merch; setEditId(null); setForm(empty); setOpen(true) }
+  const openEdit = (item) => { editBase.current = merch; setEditId(item.id); setForm({ ...item }); setOpen(true) }
+  const save = async () => {
     if (!form.name.trim()) return
     const updated = editId ? merch.map((m) => m.id === editId ? { ...form, id: editId } : m) : [...merch, { ...form, id: nextId(merch) }]
-    setMerch(updated); setOpen(false); showToast(editId ? 'Produkt oppdatert' : 'Produkt lagt til')
+    if (!await setMerch(updated, editBase.current)) return; setOpen(false); showToast(editId ? 'Produkt oppdatert' : 'Produkt lagt til')
   }
-  const remove = (id) => { setMerch(merch.filter((m) => m.id !== id)); setConfirmId(null); showToast('Produkt slettet') }
+  const remove = async (id) => { if (!await setMerch(merch.filter((m) => m.id !== id), deleteBase.current)) return; setConfirmId(null); showToast('Produkt slettet') }
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
@@ -847,7 +972,7 @@ function MerchPage({ merch, setMerch, showToast }) {
               {item.desc && <p style={{ fontSize: 13, color: CO.muted, lineHeight: 1.6, marginBottom: 10 }}>{item.desc}</p>}
               <div style={{ display: 'flex', gap: 5, marginTop: 8 }}>
                 <TFBtn small onClick={() => openEdit(item)}>✏ Rediger</TFBtn>
-                <TFBtn small variant="danger" onClick={() => setConfirmId(item.id)}>🗑 Slett</TFBtn>
+                <TFBtn small variant="danger" onClick={() => { deleteBase.current = merch; setConfirmId(item.id) } }>🗑 Slett</TFBtn>
               </div>
             </div>
           </div>
@@ -873,20 +998,22 @@ function MerchPage({ merch, setMerch, showToast }) {
 // ─── Members ──────────────────────────────────────────────────────────────────
 const MEMBER_BADGES = ['', 'Styre', 'Æresmedlem', 'Rekordinnehaver', 'Junior']
 function MembersPage({ members, setMembers, showToast }) {
+  const editBase = useRef(null)
+  const deleteBase = useRef(null)
   const empty = { name: '', role: '', badge: '', photo: '' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(empty)
   const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
-  const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
-  const openEdit = (m) => { setEditId(m.id); setForm({ ...m, photo: m.photo || '' }); setOpen(true) }
-  const save = () => {
+  const openNew = () => { editBase.current = members; setEditId(null); setForm(empty); setOpen(true) }
+  const openEdit = (m) => { editBase.current = members; setEditId(m.id); setForm({ ...m, photo: m.photo || '' }); setOpen(true) }
+  const save = async () => {
     if (!form.name.trim()) return
     const updated = editId ? members.map((m) => m.id === editId ? { ...form, id: editId } : m) : [...members, { ...form, id: nextId(members) }]
-    setMembers(updated); setOpen(false); showToast(editId ? 'Medlem oppdatert' : 'Nytt medlem lagt til')
+    if (!await setMembers(updated, editBase.current)) return; setOpen(false); showToast(editId ? 'Medlem oppdatert' : 'Nytt medlem lagt til')
   }
-  const remove = (id) => { setMembers(members.filter((m) => m.id !== id)); setConfirmId(null); showToast('Medlem fjernet') }
+  const remove = async (id) => { if (!await setMembers(members.filter((m) => m.id !== id), deleteBase.current)) return; setConfirmId(null); showToast('Medlem fjernet') }
   return (
     <div className="tf-wrap">
       <div className="tf-ph">
@@ -900,7 +1027,7 @@ function MembersPage({ members, setMembers, showToast }) {
             <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '.88rem', fontWeight: 700, color: CO.forest, marginBottom: 2 }}>{m.name}</p>
             <p style={{ fontSize: 11, color: CO.muted, marginBottom: m.badge ? 5 : 10 }}>{m.role}</p>
             {m.badge && <span className="tf-badge tf-badge-gold" style={{ marginBottom: 8, display: 'inline-flex' }}>{m.badge}</span>}
-            <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 4 }}><TFBtn small onClick={() => openEdit(m)}>✏</TFBtn><TFBtn small variant="danger" onClick={() => setConfirmId(m.id)}>🗑</TFBtn></div>
+            <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 4 }}><TFBtn small onClick={() => openEdit(m)}>✏</TFBtn><TFBtn small variant="danger" onClick={() => { deleteBase.current = members; setConfirmId(m.id) } }>🗑</TFBtn></div>
           </div>
         ))}
       </div>
@@ -920,18 +1047,20 @@ function MembersPage({ members, setMembers, showToast }) {
 
 // ─── Waters ───────────────────────────────────────────────────────────────────
 function WatersPage({ waters, setWaters, showToast }) {
+  const editBase = useRef(null)
+  const deleteBase = useRef(null)
   const empty = { name: '', location: '', desc: '', tags: [], mapUrl: '' }
   const [open, setOpen] = useState(false); const [editId, setEditId] = useState(null); const [form, setForm] = useState(empty); const [tagInput, setTagInput] = useState(''); const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }))
   const addTag = () => { const t = tagInput.trim(); if (t && !form.tags.includes(t)) setForm((p) => ({ ...p, tags: [...p.tags, t] })); setTagInput('') }
-  const openNew = () => { setEditId(null); setForm(empty); setTagInput(''); setOpen(true) }
-  const openEdit = (w) => { setEditId(w.id); setForm({ ...w, tags: [...w.tags], mapUrl: w.mapUrl || '' }); setTagInput(''); setOpen(true) }
-  const save = () => {
+  const openNew = () => { editBase.current = waters; setEditId(null); setForm(empty); setTagInput(''); setOpen(true) }
+  const openEdit = (w) => { editBase.current = waters; setEditId(w.id); setForm({ ...w, tags: [...w.tags], mapUrl: w.mapUrl || '' }); setTagInput(''); setOpen(true) }
+  const save = async () => {
     if (!form.name.trim()) return
     const updated = editId ? waters.map((w) => w.id === editId ? { ...form, id: editId } : w) : [...waters, { ...form, id: nextId(waters) }]
-    setWaters(updated); setOpen(false); showToast(editId ? 'Fiskevann oppdatert' : 'Fiskevann lagt til')
+    if (!await setWaters(updated, editBase.current)) return; setOpen(false); showToast(editId ? 'Fiskevann oppdatert' : 'Fiskevann lagt til')
   }
-  const remove = (id) => { setWaters(waters.filter((w) => w.id !== id)); setConfirmId(null); showToast('Fiskevann fjernet') }
+  const remove = async (id) => { if (!await setWaters(waters.filter((w) => w.id !== id), deleteBase.current)) return; setConfirmId(null); showToast('Fiskevann fjernet') }
   return (
     <div className="tf-wrap">
       <div className="tf-ph"><div><p className="tf-label">Fiskerettigheter</p><h2 className="tf-title">Klubbens fiskevann</h2></div><TFBtn variant="primary" onClick={openNew}>+ Nytt vann</TFBtn></div>
@@ -949,7 +1078,7 @@ function WatersPage({ waters, setWaters, showToast }) {
             )}
             <div style={{ display: 'flex', gap: 6 }}>
               <TFBtn small onClick={() => openEdit(w)} style={{ color: CO.cream, borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>✏ Rediger</TFBtn>
-              <TFBtn small variant="danger" onClick={() => setConfirmId(w.id)} style={{ background: 'rgba(220,60,60,.15)', borderColor: 'rgba(220,60,60,.3)', color: '#ff9a9a' }}>🗑</TFBtn>
+              <TFBtn small variant="danger" onClick={() => { deleteBase.current = waters; setConfirmId(w.id) } } style={{ background: 'rgba(220,60,60,.15)', borderColor: 'rgba(220,60,60,.3)', color: '#ff9a9a' }}>🗑</TFBtn>
             </div>
           </div>
         ))}
@@ -1137,22 +1266,24 @@ function MusicPage({ tracks, setTracks, currentTrack, setCurrentTrack, showToast
 
 // ─── Quotes ───────────────────────────────────────────────────────────────────
 function QuotesPage({ quotes, setQuotes, showToast }) {
+  const editBase = useRef(null)
+  const deleteBase = useRef(null)
   const empty = { author: '', text: '', date: '', context: '' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(empty)
   const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }))
-  const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
-  const openEdit = (q) => { setEditId(q.id); setForm({ ...q }); setOpen(true) }
-  const save = () => {
+  const openNew = () => { editBase.current = quotes; setEditId(null); setForm(empty); setOpen(true) }
+  const openEdit = (q) => { editBase.current = quotes; setEditId(q.id); setForm({ ...q }); setOpen(true) }
+  const save = async () => {
     if (!form.text.trim() || !form.author.trim()) return
     const updated = editId
       ? quotes.map(q => q.id === editId ? { ...form, id: editId } : q)
       : [{ ...form, id: nextId(quotes) }, ...quotes]
-    setQuotes(updated); setOpen(false); showToast(editId ? 'Sitat oppdatert' : 'Sitat lagt til')
+    if (!await setQuotes(updated, editBase.current)) return; setOpen(false); showToast(editId ? 'Sitat oppdatert' : 'Sitat lagt til')
   }
-  const remove = (id) => { setQuotes(quotes.filter(q => q.id !== id)); setConfirmId(null); showToast('Sitat slettet') }
+  const remove = async (id) => { if (!await setQuotes(quotes.filter(q => q.id !== id), deleteBase.current)) return; setConfirmId(null); showToast('Sitat slettet') }
 
   const QUOTE_COLORS = ['#1a2e1a','#2d6a8f','#8b4513','#6b4c8b','#1a5a4a']
 
@@ -1187,7 +1318,7 @@ function QuotesPage({ quotes, setQuotes, showToast }) {
                 </div>
                 <div style={{ display: 'flex', gap: 5 }}>
                   <TFBtn small onClick={() => openEdit(q)} style={{ background: 'rgba(255,255,255,0.12)', color: CO.cream, borderColor: 'rgba(255,255,255,0.2)' }}>✏</TFBtn>
-                  <TFBtn small variant="danger" onClick={() => setConfirmId(q.id)} style={{ background: 'rgba(220,60,60,0.2)', color: '#ffaaaa', borderColor: 'rgba(220,60,60,0.3)' }}>🗑</TFBtn>
+                  <TFBtn small variant="danger" onClick={() => { deleteBase.current = quotes; setConfirmId(q.id) } } style={{ background: 'rgba(220,60,60,0.2)', color: '#ffaaaa', borderColor: 'rgba(220,60,60,0.3)' }}>🗑</TFBtn>
                 </div>
               </div>
             </div>
@@ -1213,22 +1344,24 @@ function QuotesPage({ quotes, setQuotes, showToast }) {
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 function BadgesPage({ badges, setBadges, members, showToast }) {
+  const editBase = useRef(null)
+  const deleteBase = useRef(null)
   const empty = { name: '', desc: '', emoji: '🏆', winner: '', date: '', annual: false, photo: '' }
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(empty)
   const [confirmId, setConfirmId] = useState(null)
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }))
-  const openNew = () => { setEditId(null); setForm(empty); setOpen(true) }
-  const openEdit = (b) => { setEditId(b.id); setForm({ ...b }); setOpen(true) }
-  const save = () => {
+  const openNew = () => { editBase.current = badges; setEditId(null); setForm(empty); setOpen(true) }
+  const openEdit = (b) => { editBase.current = badges; setEditId(b.id); setForm({ ...b }); setOpen(true) }
+  const save = async () => {
     if (!form.name.trim()) return
     const updated = editId
       ? badges.map(b => b.id === editId ? { ...form, id: editId } : b)
       : [...badges, { ...form, id: nextId(badges) }]
-    setBadges(updated); setOpen(false); showToast(editId ? 'Premie oppdatert' : 'Premie lagt til')
+    if (!await setBadges(updated, editBase.current)) return; setOpen(false); showToast(editId ? 'Premie oppdatert' : 'Premie lagt til')
   }
-  const remove = (id) => { setBadges(badges.filter(b => b.id !== id)); setConfirmId(null); showToast('Premie slettet') }
+  const remove = async (id) => { if (!await setBadges(badges.filter(b => b.id !== id), deleteBase.current)) return; setConfirmId(null); showToast('Premie slettet') }
 
   const EMOJIS = ['🏆','🥇','🥈','🥉','🎣','🐟','🦈','⭐','🎖️','🏅','👑','💪','🌟','🎯','🔱']
   const mnames = ['', ...members.map(m => m.name)]
@@ -1267,7 +1400,7 @@ function BadgesPage({ badges, setBadges, members, showToast }) {
             {b.date && <p style={{ fontSize: 11, color: CO.muted, marginBottom: 10 }}>📅 {formatDate(b.date)}</p>}
             <div style={{ display: 'flex', gap: 5, marginTop: 'auto' }}>
               <TFBtn small onClick={() => openEdit(b)}>✏ Rediger</TFBtn>
-              <TFBtn small variant="danger" onClick={() => setConfirmId(b.id)}>🗑</TFBtn>
+              <TFBtn small variant="danger" onClick={() => { deleteBase.current = badges; setConfirmId(b.id) } }>🗑</TFBtn>
             </div>
           </div>
         ))}
@@ -1310,11 +1443,13 @@ function BadgesPage({ badges, setBadges, members, showToast }) {
 
 // ─── Rules ────────────────────────────────────────────────────────────────────
 function RulesPage({ rules, setRules, showToast }) {
+  const editBase = useRef(null)
+  const deleteBase = useRef(null)
   const [editingId, setEditingId] = useState(null); const [editTitle, setEditTitle] = useState(''); const [editItems, setEditItems] = useState([]); const [newItemText, setNewItemText] = useState(''); const [confirmId, setConfirmId] = useState(null)
-  const startEdit = (r) => { setEditingId(r.id); setEditTitle(r.title); setEditItems([...r.items]); setNewItemText('') }
-  const saveEdit = () => { setRules(rules.map((r) => r.id === editingId ? { ...r, title: editTitle, items: editItems } : r)); setEditingId(null); showToast('Regler oppdatert') }
-  const removeBlock = (id) => { setRules(rules.filter((r) => r.id !== id)); setConfirmId(null); showToast('Regelblokk slettet') }
-  const addBlock = () => { setRules([...rules, { id: nextId(rules), icon: '📋', title: 'Ny regelblokk', items: ['Regel 1'] }]); showToast('Regelblokk lagt til') }
+  const startEdit = (r) => { editBase.current = rules; setEditingId(r.id); setEditTitle(r.title); setEditItems([...r.items]); setNewItemText('') }
+  const saveEdit = async () => { if (!await setRules(rules.map((r) => r.id === editingId ? { ...r, title: editTitle, items: editItems } : r), editBase.current)) return; setEditingId(null); showToast('Regler oppdatert') }
+  const removeBlock = async (id) => { if (!await setRules(rules.filter((r) => r.id !== id), deleteBase.current)) return; setConfirmId(null); showToast('Regelblokk slettet') }
+  const addBlock = async () => { if (!await setRules([...rules, { id: nextId(rules), icon: '📋', title: 'Ny regelblokk', items: ['Regel 1'] }], rules)) return; showToast('Regelblokk lagt til') }
   return (
     <div className="tf-wrap">
       <div className="tf-ph"><div><p className="tf-label">Vedtekter & etikk</p><h2 className="tf-title">Regler og retningslinjer</h2></div><TFBtn variant="primary" onClick={addBlock}>+ Ny regelblokk</TFBtn></div>
@@ -1332,7 +1467,7 @@ function RulesPage({ rules, setRules, showToast }) {
               <>
                 <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1rem', fontWeight: 700, color: CO.forest, marginBottom: 10 }}>{r.icon} {r.title}</h3>
                 <ul style={{ paddingLeft: '1.1rem' }}>{r.items.map((item, i) => <li key={i} style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 2 }}>{item}</li>)}</ul>
-                <div style={{ display: 'flex', gap: 6, marginTop: 12 }}><TFBtn small onClick={() => startEdit(r)}>✏ Rediger</TFBtn><TFBtn small variant="danger" onClick={() => setConfirmId(r.id)}>🗑</TFBtn></div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 12 }}><TFBtn small onClick={() => startEdit(r)}>✏ Rediger</TFBtn><TFBtn small variant="danger" onClick={() => { deleteBase.current = rules; setConfirmId(r.id) } }>🗑</TFBtn></div>
               </>
             )}
           </div>
@@ -1822,41 +1957,61 @@ export default function App() {
   const [toastMsg, setToastMsg] = useState(null)
   const toastTimer = useRef(null)
 
-  const [news, setNews] = useState(SEED.news)
-  const [events, setEvents] = useState(SEED.events)
-  const [members, setMembers] = useState(SEED.members)
-  const [waters, setWaters] = useState(SEED.waters)
-  const [rules, setRules] = useState(SEED.rules)
-  const [catches, setCatches] = useState(SEED.catches)
-  const [merch, setMerch] = useState(SEED.merch)
-  const [quotes, setQuotes] = useState(SEED.quotes)
-  const [badges, setBadges] = useState(SEED.badges)
+  const [news, setNews] = useState([])
+  const [events, setEvents] = useState([])
+  const [members, setMembers] = useState([])
+  const [waters, setWaters] = useState([])
+  const [rules, setRules] = useState([])
+  const [catches, setCatches] = useState([])
+  const [merch, setMerch] = useState([])
+  const [quotes, setQuotes] = useState([])
+  const [badges, setBadges] = useState([])
   const [tracks, setTracks] = useState(() => {
     try { return JSON.parse(localStorage.getItem('tf_tracks') || '[]') } catch { return [] }
   })
   const [currentTrack, setCurrentTrack] = useState(null)
 
-  useEffect(() => {
-    const KEYS = ['news', 'events', 'members', 'waters', 'rules', 'catches', 'merch', 'quotes', 'badges']
-    const setters = { news: setNews, events: setEvents, members: setMembers, waters: setWaters, rules: setRules, catches: setCatches, merch: setMerch, quotes: setQuotes, badges: setBadges }
-    Promise.all(KEYS.map((k) => fbGet(k))).then((results) => {
-      KEYS.forEach((k, i) => {
-        if (results[i] !== null) {
-          // Key exists in Firebase (even if empty array) — always use Firebase data, never overwrite
-          setters[k](results[i])
-        } else {
-          // Key has NEVER existed in Firebase — seed it once
-          fbSet(k, SEED[k])
-        }
-      })
-    })
-    const unsubs = KEYS.map((k) => fbListen(k, (data) => setters[k](data)))
-    return () => unsubs.forEach((u) => u())
-  }, [])
+  const [ready, setReady] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [storageError, setStorageError] = useState('')
+  const [retry, setRetry] = useState(0)
+  const writeLock = useRef(false)
+  const loaded = useRef(new Set())
+  const values = { news, events, members, waters, rules, catches, merch, quotes, badges }
 
-  const makeSetter = (setter, key) => (val) => {
-    setter((prev) => { const v = typeof val === 'function' ? val(prev) : val; fbSet(key, v); return v })
+  useEffect(() => {
+    let active = true
+    loaded.current = new Set()
+    setReady(false)
+    const setters = { news: setNews, events: setEvents, members: setMembers, waters: setWaters, rules: setRules, catches: setCatches, merch: setMerch, quotes: setQuotes, badges: setBadges }
+    const unsubs = DATA_KEYS.map(key => fbListen(key, result => {
+      if (!active) return
+      setters[key](result.items)
+      loaded.current.add(key)
+      if (loaded.current.size === DATA_KEYS.length) setReady(true)
+    }, error => {
+      if (!active) return
+      loaded.current.delete(key)
+      setReady(false)
+      setStorageError(`Kunne ikke lese ${key}: ${error.message}. Ingen standarddata blir lagret.`)
+    }))
+    return () => { active = false; unsubs.forEach(unsub => unsub()) }
+  }, [retry])
+
+  // Single in-flight operation, including imports. No side effects inside React state updaters.
+  const perform = async action => {
+    if (writeLock.current) return false
+    if (loaded.current.size !== DATA_KEYS.length) { setStorageError('Vent til alle data er lest fra serveren.'); return false }
+    writeLock.current = true; setSaving(true); setStorageError('')
+    try { await action(); return true }
+    catch (error) { setStorageError(`Ikke fullført: ${error.message}`); return false }
+    finally { writeLock.current = false; setSaving(false) }
   }
+  const makeSetter = (_setter, key) => async (value, expected = values[key]) => perform(async () => {
+    const next = typeof value === 'function' ? value(expected) : value
+    await fbSet(key, next, expected)
+    // The listener supplies the committed state; never apply a potentially older response here.
+  })
 
   const setNewsP = makeSetter(setNews, 'news')
   const setEventsP = makeSetter(setEvents, 'events')
@@ -1875,8 +2030,8 @@ export default function App() {
 
   const showToast = (msg) => { setToastMsg(msg); if (toastTimer.current) clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToastMsg(null), 2500) }
 
-  if (!loggedIn) return <LoginScreen onLogin={() => {
-    setLoggedIn(true)
+  if (!loggedIn) return <LoginScreen onLogin={(role) => {
+    setLoggedIn(role)
     // Autostart first track if any uploaded
     if (tracks.length > 0 && !currentTrack) setCurrentTrack(tracks[0])
   }} />
@@ -1884,7 +2039,15 @@ export default function App() {
   return (
     <div style={{ minHeight: '100dvh', background: CO.cream, paddingBottom: currentTrack ? 80 : 0 }}>
       <style>{GLOBAL_CSS}</style>
-      <SiteNav currentPage={page} onNavigate={setPage} onLogout={() => setLoggedIn(false)} />
+      <SiteNav currentPage={page} onNavigate={setPage} onLogout={async () => {
+        try { await signOut(auth); setLoggedIn(false) }
+        catch (error) { setStorageError(`Kunne ikke logge ut: ${error.message}`) }
+      }} />
+      {storageError && <div role="alert" style={{ position: 'fixed', bottom: 16, left: '5%', right: '5%', padding: 16, background: CO.cream, border: '2px solid #a22', color: '#a22', zIndex: 10000 }}>{storageError} <TFBtn onClick={() => setRetry(n => n + 1)}>Prøv å lese på nytt</TFBtn> <TFBtn onClick={() => setStorageError('')}>Lukk melding</TFBtn></div>}
+      {!ready && <p role="status" className="tf-wrap">Venter på bekreftede data fra serveren. Redigering er sperret.</p>}
+      {saving && <p role="status" className="tf-wrap">Lagrer – vent på bekreftelse fra serveren …</p>}
+      {loggedIn === 'admin' && <BackupPanel ready={ready} busy={saving} perform={perform} showToast={showToast} />}
+      <fieldset disabled={!ready || saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       {page === 'hjem' && <HomePage news={news} events={events} members={members} waters={waters} catches={catches} onNavigate={setPage} />}
       {page === 'nyheter' && <NewsPage news={news} setNews={setNewsP} showToast={showToast} />}
       {page === 'arrangement' && <EventsPage events={events} setEvents={setEventsP} showToast={showToast} />}
@@ -1895,6 +2058,7 @@ export default function App() {
       {page === 'sitater' && <QuotesPage quotes={quotes} setQuotes={setQuotesP} showToast={showToast} />}
       {page === 'priser' && <BadgesPage badges={badges} setBadges={setBadgesP} members={members} showToast={showToast} />}
       {page === 'medlemmer' && <MembersPage members={members} setMembers={setMembersP} showToast={showToast} />}
+      </fieldset>
       {page === 'musikk' && <MusicPage tracks={tracks} setTracks={setTracksP} currentTrack={currentTrack} setCurrentTrack={setCurrentTrack} showToast={showToast} />}
       {page === 'spill' && <FishingGame />}
       <footer style={{ background: CO.deep, color: 'rgba(245,240,232,.5)', padding: '2rem 1rem', textAlign: 'center', borderTop: `1px solid rgba(200,146,42,.2)` }}>
