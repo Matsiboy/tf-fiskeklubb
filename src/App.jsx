@@ -17,8 +17,8 @@ const CO = {
   white: '#ffffff', text: '#2a2a2a',
 }
 
-// Brand image: original full-colour emblem, stored with the website (never in Firestore).
-const CLUB_LOGO = `${import.meta.env.BASE_URL}tordivelen-flugua-logo.webp`
+// Brand image: compact T&F fishing-club emblem, stored with the website (never in Firestore).
+const CLUB_LOGO = `${import.meta.env.BASE_URL}tordivelen-flugua-tf-logo.webp`
 
 const NO_MONTHS = ['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember']
 function formatDate(iso) {
