@@ -17,6 +17,9 @@ const CO = {
   white: '#ffffff', text: '#2a2a2a',
 }
 
+// Brand image: original full-colour emblem, stored with the website (never in Firestore).
+const CLUB_LOGO = `${import.meta.env.BASE_URL}tordivelen-flugua-logo.webp`
+
 const NO_MONTHS = ['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember']
 function formatDate(iso) {
   if (!iso) return ''
@@ -436,17 +439,7 @@ function LoginScreen({ onLogin }) {
   return (
     <div style={{ minHeight: '100dvh', background: CO.deep, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
       <div style={{ background: CO.forest, border: `1px solid rgba(200,146,42,.3)`, borderRadius: 14, padding: '2.5rem 2rem', width: '100%', maxWidth: 380, textAlign: 'center' }}>
-        <svg width="60" height="60" viewBox="0 0 80 80" fill="none" style={{ marginBottom: '1rem' }}>
-          <circle cx="40" cy="40" r="38" stroke={CO.gold} strokeWidth="1.5" strokeDasharray="4 3" />
-          <ellipse cx="40" cy="30" rx="12" ry="5" fill={CO.river} opacity=".9" />
-          <path d="M40 25 Q44 18 50 20" stroke={CO.gold} strokeWidth="1.5" fill="none" strokeLinecap="round" />
-          <path d="M40 35 L40 52 Q40 60 47 60 Q54 60 54 53" stroke={CO.gold} strokeWidth="2" fill="none" strokeLinecap="round" />
-          <path d="M54 53 L50 56" stroke={CO.gold} strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M32 28 Q28 24 30 20" stroke={CO.goldLt} strokeWidth="1" fill="none" opacity=".7" />
-          <path d="M48 28 Q52 24 50 20" stroke={CO.goldLt} strokeWidth="1" fill="none" opacity=".7" />
-          <ellipse cx="40" cy="65" rx="18" ry="3" stroke="#4a8fb5" strokeWidth="1" fill="none" opacity=".5" />
-        </svg>
-        <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: '1.5rem', color: CO.cream, marginBottom: '.2rem' }}>Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua</h1>
+        <img src={CLUB_LOGO} alt="Tordivelen & Flugua fiskeklubb" style={{ display: "block", width: "min(100%, 270px)", height: "auto", margin: "0 auto 1rem", filter: "drop-shadow(0 8px 18px rgba(0,0,0,.2))" }} />
         <p style={{ fontStyle: 'italic', color: CO.mist, marginBottom: '.5rem', opacity: .85, fontSize: 14 }}>Fiskeklubb — Medlemsportal</p>
         <p style={{ fontStyle: 'italic', color: CO.gold, fontSize: 12, opacity: .75, marginBottom: '.25rem' }}>„Með stöng í hendi, og von í hjarta"</p>
         <p style={{ fontStyle: 'italic', color: CO.mist, fontSize: 11, opacity: .55, marginBottom: '1.75rem' }}>Med en stang i hendene og håp i hjertet</p>
@@ -485,7 +478,7 @@ function SiteNav({ currentPage, onNavigate, onLogout }) {
     <nav style={{ background: CO.forest, borderBottom: `2px solid ${CO.gold}`, position: 'sticky', top: 0, zIndex: 200 }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
         <button onClick={() => { onNavigate('hjem'); setMobileOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <svg width="28" height="28" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="17" stroke={CO.gold} strokeWidth="1.2" /><ellipse cx="18" cy="14" rx="7" ry="3" fill={CO.river} opacity=".9" /><path d="M18 17 L18 27 Q18 31 22 31 Q26 31 26 27" stroke={CO.gold} strokeWidth="1.5" fill="none" strokeLinecap="round" /></svg>
+          <img src={CLUB_LOGO} alt="Tordivelen & Flugua" style={{ width: 56, height: 45, objectFit: "contain", display: "block", flexShrink: 0 }} />
           <span style={{ fontFamily: "'Playfair Display',serif", fontSize: '1rem', color: CO.cream }}>T<span style={{ color: CO.gold }}>&</span>F</span>
         </button>
         <div className="tf-nav-desktop" style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -510,6 +503,7 @@ function Hero({ memberCount, waterCount }) {
   return (
     <div style={{ background: CO.forest, position: 'relative', minHeight: 340, display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 60% at 70% 0%,rgba(45,106,143,.25) 0%,transparent 60%),linear-gradient(180deg,#0f1d0f 0%,#1a2e1a 50%,#142814 100%)' }} />
+      <img src={CLUB_LOGO} alt="" aria-hidden="true" style={{ position: "absolute", right: "-3%", top: "50%", transform: "translateY(-50%)", width: "min(57vw, 600px)", maxHeight: "96%", objectFit: "contain", opacity: 0.12, pointerEvents: "none", userSelect: "none" }} />
       <svg style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, opacity: .35 }} viewBox="0 0 1200 100" preserveAspectRatio="none">
         <defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2d6a8f" stopOpacity=".6" /><stop offset="100%" stopColor="#2d6a8f" stopOpacity="0" /></linearGradient></defs>
         <path d="M0 40 Q150 10 300 40 Q450 70 600 30 Q750 0 900 35 Q1050 70 1200 25 L1200 100 L0 100Z" fill="url(#wg)" />
@@ -2062,6 +2056,7 @@ export default function App() {
       {page === 'musikk' && <MusicPage tracks={tracks} setTracks={setTracksP} currentTrack={currentTrack} setCurrentTrack={setCurrentTrack} showToast={showToast} />}
       {page === 'spill' && <FishingGame />}
       <footer style={{ background: CO.deep, color: 'rgba(245,240,232,.5)', padding: '2rem 1rem', textAlign: 'center', borderTop: `1px solid rgba(200,146,42,.2)` }}>
+        <img src={CLUB_LOGO} alt="" aria-hidden="true" style={{ display: 'block', width: 92, height: 70, objectFit: 'contain', margin: '0 auto .4rem' }} />
         <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '1rem', color: CO.cream, marginBottom: 5 }}>Tordivelen <span style={{ color: CO.gold }}>&</span> Flugua</p>
         <p style={{ fontSize: 12, lineHeight: 1.8 }}>Fiskeklubb stiftet {FOUNDED_YEAR} · Nøklevann, Oslo<br />Kontakt: rodkyrre@bleikjur.is</p>
       </footer>
