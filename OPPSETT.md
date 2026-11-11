@@ -1,5 +1,13 @@
 # 🎣 Tordivelen & Flugua — Oppsettguide
 
+> **Oppdatert merknad (2026):** Nettstedet og Firebase-prosjektet finnes allerede.
+> Trinnene nedenfor er en historisk oppstartsguide, ikke en veiledning for å
+> nullstille det eksisterende prosjektet. Ikke opprett en ny database eller
+> endre gjeldende Firestore-regler bare for å oppdatere nettsiden.
+> **Ikke bruk «Start in test mode» for en produksjonsdatabase.** Testregler
+> kan tillate uautoriserte endringer og har tidsbegrensning. Se
+> [STORAGE-SAFETY.md](STORAGE-SAFETY.md) for dagens lagring og sikkerhet.
+
 Følg disse stegene én gang, så er siden live for alle klubbmedlemmer.
 Tar ca. 20–30 minutter totalt.
 
