@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { db, auth } from './firebase.js'
 import { doc, getDocFromServer, runTransaction, onSnapshot } from 'firebase/firestore'
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth'
@@ -227,6 +227,8 @@ function fileToBase64(file, maxSize = 600) {
         canvas.getContext('2d').drawImage(img, 0, 0, w, h)
         resolve(canvas.toDataURL('image/jpeg', 0.75))
       }
+      // An invalid or corrupt image must reject, not leave the upload spinner running.
+      img.onerror = () => reject(new Error('Kunne ikke åpne bildefilen.'))
       img.src = e.target.result
     }
     reader.onerror = reject
@@ -301,14 +303,6 @@ function kFactor(weightKg, lengthCm) {
   const k = (weightKg * 1000 * 100) / Math.pow(lengthCm, 3)
   return k.toFixed(2)
 }
-function kLabel(k) {
-  if (!k) return ''
-  const v = parseFloat(k)
-  if (v >= 1.4) return '🟢 Utmerket'
-  if (v >= 1.1) return '🟡 God'
-  if (v >= 0.8) return '🟠 Middels'
-  return '🔴 Lav'
-}
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 function TFBtn({ children, variant = 'ghost', small = false, onClick, style = {} }) {
   const cls = ['tf-btn', variant === 'primary' ? 'tf-primary' : variant === 'danger' ? 'tf-danger' : variant === 'forest' ? 'tf-forest' : 'tf-ghost', small ? 'tf-sm' : ''].join(' ')
@@ -347,6 +341,7 @@ function photoY(p)   { return p && typeof p === 'object' ? (p.y ?? 50) : 50 }
 
 function PhotoUpload({ photo, onPhoto, onClear, circle = false, label = 'Last opp bilde' }) {
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
   const dragRef = useRef(null)
   const containerRef = useRef(null)
 
@@ -356,12 +351,17 @@ function PhotoUpload({ photo, onPhoto, onClear, circle = false, label = 'Last op
 
   const handleFile = async (e) => {
     const file = e.target.files[0]; if (!file) return
+    setUploadError('')
     setUploading(true)
     try {
       const b64 = await fileToBase64(file, circle ? 400 : 1200)
       onPhoto({ src: b64, x: 50, y: 50 })
-    } catch {}
-    setUploading(false)
+    } catch {
+      setUploadError('Kunne ikke laste inn bildet. Prøv en annen bildefil.')
+    } finally {
+      e.target.value = ''
+      setUploading(false)
+    }
   }
 
   const onPointerDown = (e) => {
@@ -419,6 +419,7 @@ function PhotoUpload({ photo, onPhoto, onClear, circle = false, label = 'Last op
         {!src && <p style={{ fontSize: 12, color: CO.muted, lineHeight: 1.5 }}>Klikk for å laste opp bilde.</p>}
         {src && <p style={{ fontSize: 12, color: CO.muted, marginBottom: 6 }}>Dra bildet for å velge utsnitt.</p>}
         {uploading && <p style={{ fontSize: 12, color: CO.gold }}>Laster opp…</p>}
+        {uploadError && <p role="alert" style={{ fontSize: 12, color: '#c0392b' }}>{uploadError}</p>}
         {src && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <label style={{ fontSize: 12, color: CO.river, textDecoration: 'underline', cursor: 'pointer' }}>
@@ -1202,16 +1203,15 @@ function MusicPage({ tracks, setTracks, currentTrack, setCurrentTrack, showToast
     try {
       const src = await audioToBase64(file)
       const newTrack = { id: nextId(tracks), name: file.name.replace(/\.[^.]+$/, ''), src }
-      setTracks([...tracks, newTrack])
-      showToast('Sang lastet opp!')
+      if (setTracks([...tracks, newTrack])) showToast('Sang lastet opp!')
     } catch { showToast('Feil ved opplasting') }
     setUploading(false)
     e.target.value = ''
   }
 
   const remove = (id) => {
+    if (!setTracks(tracks.filter(t => t.id !== id))) return
     if (currentTrack?.id === id) setCurrentTrack(null)
-    setTracks(tracks.filter(t => t.id !== id))
     setConfirmId(null); showToast('Sang slettet')
   }
 
@@ -1865,9 +1865,6 @@ function FishingGame() {
     }
   }, [])
 
-  const holdKey = (key) => { if (gsRef.current) gsRef.current.keys[key] = true }
-  const releaseKey = (key) => { if (gsRef.current) gsRef.current.keys[key] = false }
-
   // Touch-follow: finger position drives player directly on mobile
   const touchTargetRef = useRef(null) // { x, y } in canvas coords
 
@@ -2001,25 +1998,32 @@ export default function App() {
     catch (error) { setStorageError(`Ikke fullført: ${error.message}`); return false }
     finally { writeLock.current = false; setSaving(false) }
   }
-  const makeSetter = (_setter, key) => async (value, expected = values[key]) => perform(async () => {
+  const makeSetter = (key) => async (value, expected = values[key]) => perform(async () => {
     const next = typeof value === 'function' ? value(expected) : value
     await fbSet(key, next, expected)
     // The listener supplies the committed state; never apply a potentially older response here.
   })
 
-  const setNewsP = makeSetter(setNews, 'news')
-  const setEventsP = makeSetter(setEvents, 'events')
-  const setMembersP = makeSetter(setMembers, 'members')
-  const setWatersP = makeSetter(setWaters, 'waters')
-  const setRulesP = makeSetter(setRules, 'rules')
-  const setCatchesP = makeSetter(setCatches, 'catches')
-  const setMerchP = makeSetter(setMerch, 'merch')
-  const setQuotesP = makeSetter(setQuotes, 'quotes')
-  const setBadgesP = makeSetter(setBadges, 'badges')
-  const setTracksP = (val) => {
-    const v = typeof val === 'function' ? val(tracks) : val
-    setTracks(v)
-    try { localStorage.setItem('tf_tracks', JSON.stringify(v)) } catch {}
+  const setNewsP = makeSetter('news')
+  const setEventsP = makeSetter('events')
+  const setMembersP = makeSetter('members')
+  const setWatersP = makeSetter('waters')
+  const setRulesP = makeSetter('rules')
+  const setCatchesP = makeSetter('catches')
+  const setMerchP = makeSetter('merch')
+  const setQuotesP = makeSetter('quotes')
+  const setBadgesP = makeSetter('badges')
+  // Keep the UI unchanged if the browser refuses to persist music (e.g. quota exceeded).
+  const setTracksP = (value) => {
+    const next = typeof value === 'function' ? value(tracks) : value
+    try {
+      localStorage.setItem('tf_tracks', JSON.stringify(next))
+      setTracks(next)
+      return true
+    } catch (error) {
+      setStorageError(`Kunne ikke lagre musikken i nettleseren: ${error.message}`)
+      return false
+    }
   }
 
   const showToast = (msg) => { setToastMsg(msg); if (toastTimer.current) clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToastMsg(null), 2500) }
